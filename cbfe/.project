@@ -3,16 +3,8 @@
 	<name>cbfe</name>
 	<comment></comment>
 	<projects>
-		<project>aramis_cdt</project>
-		<project>etsproxy</project>
 		<project>ibvpy</project>
 		<project>mathkit</project>
-		<project>matresdev</project>
-		<project>mxn</project>
-		<project>quaducom</project>
-		<project>rostar</project>
-		<project>scratch</project>
-		<project>sctt</project>
 		<project>spirrid</project>
 		<project>ssm</project>
 		<project>stats</project>

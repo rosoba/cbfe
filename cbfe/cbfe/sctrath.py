@@ -27,22 +27,27 @@ if __name__ == '__main__':
     # element array with nodal coordinates
     # [ e, n, d ]
     E_X = domain.elem_X_map
+    print E_X
     # [ r, i ]
     r_ip = fets_eval.ip_coords[:, :-1].T
+    print 'r_ip', r_ip
     # [ i ]
     w_ip = fets_eval.ip_weights
     # [ d, n ]
     geo_r = fets_eval.geo_r.T
+    print 'geo_r', geo_r
     # [ d, n, i ]
     dNr_geo = geo_r[:, :, None] * (1 + np.flipud( r_ip )[:, None,:] * np.flipud(geo_r)[:,:, None] ) / 4.0
+    print 'dNr_geo', dNr_geo
     # [ i, n, d ]
     dNr_geo = np.einsum('dni->ind', dNr_geo)
+    print dNr_geo.shape
     # [ e, i, d, f ]
     J_mtx = np.einsum('ind,enf->eidf', dNr_geo, E_X)
     J_inv = np.linalg.inv(J_mtx)
     J_det = np.linalg.det(J_mtx)
 
-    # shape function for the unknowns are identical with the geomeetrical
+    # shape function for the unknowns are identical with the geometrical
     # approximation
     dNr = dNr_geo
 

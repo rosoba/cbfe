@@ -4,9 +4,11 @@ Created on Sep 12, 2015
 
 @author: rch
 '''
-
+from mayavi.sources.api import VTKDataSource, VTKFileReader
+from envisage.ui.workbench.api import WorkbenchApplication
 from ibvpy.fets.fets1D5 import FETS1D52L4ULRH
-from ibvpy.mats.mats2D.mats2D_elastic.mats2D_elastic import MATS2DElastic
+from ibvpy.mats.mats1D5.mats1D5_bond import MATS1D5Bond
+from ibvpy.mats.mats1D import MATS1DElastic
 from ibvpy.mesh.fe_grid import FEGrid
 from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import numpy as np
@@ -17,19 +19,23 @@ if __name__ == '__main__':
     #=========================================================================
     # Material matrix
     #=========================================================================
-    mats_eval = MATS2DElastic(E=28e3, nu=0.2)
-    D_el = mats_eval.D_el
+    mats_eval = MATS1D5Bond(mats_phase1=MATS1DElastic(E=10.),
+                            mats_phase2=MATS1DElastic(E=20.),
+                            mats_ifslip=MATS1DElastic(E=5.),
+                            mats_ifopen=MATS1DElastic(E=1.))
+    D_el = np.diag(np.array([10., 5., 1., 20.]))
     n_s = D_el.shape[0]
 
     #=========================================================================
     # Element definition
     #=========================================================================
-    fets_eval = FETS2D4Q(mats_eval=mats_eval)
+    fets_eval = FETS1D52L4ULRH(mats_eval=mats_eval)
     n_geo_r, n_dim_geo = fets_eval.geo_r.shape
     n_dof_r, n_dim_dof = fets_eval.dof_r.shape
     n_ip = fets_eval.n_gp
     n_el_dofs = n_dof_r * n_dim_dof
 
+    #[ d, i]
     r_ip = fets_eval.ip_coords[:, :-1].T
     # [ i ]
     w_ip = fets_eval.ip_weights
@@ -37,7 +43,7 @@ if __name__ == '__main__':
     geo_r = fets_eval.geo_r.T
     # [ d, n, i ]
     dNr_geo = geo_r[
-        :, :, None] * (1 + np.flipud(r_ip)[:, None, :] * np.flipud(geo_r)[:, :, None]) / 4.0
+        :,:, None] * (1 + np.flipud(r_ip)[:, None,:] * np.flipud(geo_r)[:,:, None]) / 4.0
     # [ i, n, d ]
     dNr_geo = np.einsum('dni->ind', dNr_geo)
 
@@ -50,7 +56,7 @@ if __name__ == '__main__':
     n_e_y = 1
     # length
     L_x = 20.0
-    L_y = 10.0
+    L_y = 2.
     # [ r, i ]
     domain = FEGrid(coord_max=(L_x, L_y),
                     shape=(n_e_x, n_e_y),
@@ -60,24 +66,31 @@ if __name__ == '__main__':
     # element array with nodal coordinates
     # [ n_e, n_geo_r, n_dim_geo ]
     elem_x_map = domain.elem_X_map
+    print 'elem_x_map', elem_x_map
     # [ n_e, n_dof_r, n_dim_dof ]
     elem_dof_map = domain.elem_dof_map
+#     print 'elem_dof_map', elem_dof_map
 
-    # [ n_e, n_ip, n_geo_r, n_dim_geo ]
+    # [ n_e, n_ip, n_dim_geo, n_dim_geo ]
     J_mtx = np.einsum('ind,enf->eidf', dNr_geo, elem_x_map)
+    print 'J_mtx', J_mtx
     J_inv = np.linalg.inv(J_mtx)
+    print 'J_inv', J_inv
     J_det = np.linalg.det(J_mtx)
 
-    # shape function for the unknowns are identical with the geomeetric
-    # approximation
-    dNr = dNr_geo
+    # shape function for the unknowns
+    # [ n_geo_r, n_ip]
+    Nr = 0.5 * (1. + geo_r[0,:, None] * r_ip[None, 0])
+    print geo_r[0,:]
+    print 'Nr', Nr
+    print Nr.shape
 
     # [ n_e, n_ip, n_dof_r, n_dim_dof ]
-    dNx = np.einsum('eidf,inf->eind', J_inv, dNr)
+#     dNx = np.einsum('eidf,inf->eind', J_inv, dNr)
 
     B = np.zeros((n_e, n_ip, n_dof_r, n_s, n_dim_dof), dtype='f')
-    B_n_rows, B_n_cols, dNx_d = [0, 1, 2, 2], [0, 1, 0, 1], [0, 1, 1, 0]
-    B[:, :, :, B_n_rows, B_n_cols] = dNx[:, :, :, dNx_d]
+    B_n_rows, B_n_cols = [0, 1, 2], [0, 0, 1]
+    B[:,:, 0, B_n_rows, B_n_cols] = dNx[:,:, 0, 0],
 
     #=========================================================================
     # System matrix

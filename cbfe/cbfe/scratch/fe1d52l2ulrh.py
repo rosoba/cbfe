@@ -7,59 +7,120 @@ Created on Sep 12, 2015
 from envisage.ui.workbench.api import WorkbenchApplication
 from mayavi.sources.api import VTKDataSource, VTKFileReader
 
-from ibvpy.fets.fets1D5 import FETS1D52L4ULRH
+from traits.api import implements, Int, Array
+from ibvpy.fets.fets_eval import FETSEval, IFETSEval
 from ibvpy.mats.mats1D import MATS1DElastic
 from ibvpy.mats.mats1D5.mats1D5_bond import MATS1D5Bond
 from ibvpy.mesh.fe_grid import FEGrid
 from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import numpy as np
 
+
+class FETS1D52ULRH(FETSEval):
+    '''
+    Fe Bar 2 nodes, deformation
+    '''
+
+    implements(IFETSEval)
+
+    debug_on = True
+
+    # Dimensional mapping
+    dim_slice = slice(0, 1)
+
+    n_e_dofs = Int(4)
+    n_nodal_dofs = Int(2)
+
+    dof_r = Array(value=[[-1], [1]])
+    geo_r = Array(value=[[-1], [1]])
+    vtk_r = Array(value=[[-1.], [1.]])
+    vtk_cells = [[0, 1]]
+    vtk_cell_types = 'Line'
+
+    def _get_ip_coords(self):
+        offset = 1e-6
+        return np.array([[-1 + offset, 0., 0.], [1 - offset, 0., 0.]])
+
+    def _get_ip_weights(self):
+        return np.array([1., 1.], dtype=float)
+
+    # Integration parameters
+    #
+    ngp_r = 2
+
+    def get_N_geo_mtx(self, r_pnt):
+        '''
+        Return geometric shape functions
+        @param r_pnt:
+        '''
+        r = r_pnt[0]
+        N_mtx = np.array([[0.5 - r / 2., 0.5 + r / 2.]])
+        return N_mtx
+
+    def get_dNr_geo_mtx(self, r_pnt):
+        '''
+        Return the matrix of shape function derivatives.
+        Used for the conrcution of the Jacobi matrix.
+        '''
+        return np.array([[-1. / 2, 1. / 2]])
+
+    def get_N_mtx(self, r_pnt):
+        '''
+        Return shape functions
+        @param r_pnt:local coordinates
+        '''
+        return self.get_N_geo_mtx(r_pnt)
+
+    def get_dNr_mtx(self, r_pnt):
+        '''
+        Return the derivatives of the shape functions
+        '''
+        return self.get_dNr_geo_mtx(r_pnt)
+
+
 if __name__ == '__main__':
 
     #=========================================================================
     # Material matrix
     #=========================================================================
-    mats_eval = MATS1D5Bond(mats_phase1=MATS1DElastic(E=10.),
-                            mats_phase2=MATS1DElastic(E=20.),
-                            mats_ifslip=MATS1DElastic(E=5.),
-                            mats_ifopen=MATS1DElastic(E=1.))
-    D_el = np.diag(np.array([10., 5., 1., 20.]))
+    D_el = np.diag(np.array([10., 5., 10.]))
     n_s = D_el.shape[0]
 
     #=========================================================================
     # Element definition
     #=========================================================================
-    fets_eval = FETS1D52L4ULRH(mats_eval=mats_eval)
+    fets_eval = FETS1D52ULRH()
     n_geo_r, n_dim_geo = fets_eval.geo_r.shape
     n_dof_r, n_dim_dof = fets_eval.dof_r.shape
+    n_dim_dof = 2
     n_ip = fets_eval.n_gp
     n_el_dofs = n_dof_r * n_dim_dof
 
     #[ d, i]
-    r_ip = fets_eval.ip_coords[:, :-1].T
+    r_ip = fets_eval.ip_coords[:, :-2].T
+    print 'r_ip', r_ip.shape
     # [ i ]
     w_ip = fets_eval.ip_weights
     # [ d, n ]
     geo_r = fets_eval.geo_r.T
     # [ d, n, i ]
-    dNr_geo = geo_r[
-        :, :, None] * (1 + np.flipud(r_ip)[:, None, :] * np.flipud(geo_r)[:, :, None]) / 4.0
+    dNr_geo = (geo_r[:, :, None] * (1 + r_ip[:, None, :]
+                                    * geo_r[:, :, None]) / 4.0)
     # [ i, n, d ]
     dNr_geo = np.einsum('dni->ind', dNr_geo)
+    print 'Dnr_geo', dNr_geo.shape
 
     #=========================================================================
     # Discretization
     #=========================================================================
 
     # Number of elements
-    n_e_x = 2
-    n_e_y = 1
+    n_e_x = 1
     # length
     L_x = 20.0
-    L_y = 2.
     # [ r, i ]
-    domain = FEGrid(coord_max=(L_x, L_y),
-                    shape=(n_e_x, n_e_y),
+    domain = FEGrid(coord_max=(L_x,),
+                    shape=(n_e_x,),
                     fets_eval=fets_eval)
     n_e = domain.n_active_elems
     n_dofs = domain.n_dofs
@@ -80,8 +141,8 @@ if __name__ == '__main__':
 
     # shape function for the unknowns
     # [ n_geo_r, n_ip]
-    Nr = 0.5 * (1. + geo_r[0, :, None] * r_ip[None, 0])
-    dNr = 0.5 * geo_r[0, :, None]
+    Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None, :])
+    dNr = 0.5 * geo_r[:, :, None]
 
     print geo_r[0, :]
     print 'Nr', Nr
@@ -89,12 +150,31 @@ if __name__ == '__main__':
     print 'dNr', dNr
     print dNr.shape
 
+    Nx = Nr
     # [ n_e, n_ip, n_dof_r, n_dim_dof ]
     dNx = np.einsum('eidf,inf->eind', J_inv, dNr)
 
     B = np.zeros((n_e, n_ip, n_dof_r, n_s, n_dim_dof), dtype='f')
-    B_n_rows, B_n_cols = [0, 1, 2], [0, 0, 1]
-    B[:, :, 0, B_n_rows, B_n_cols] = dNx[:, :, 0, 0],
+    print 'B', B.shape
+
+    B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
+    B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
+
+    B_factors = np.array([1, -1], dtype='float_')
+
+    print B_N_n_cols
+    print B_N_n_rows
+    print 'B', B.shape
+
+    print N_idx
+    print 'dNx', dNx.shape
+    B[:, :, :, B_N_n_rows, B_N_n_cols] = (B_factors[None, None, None, :] *
+                                          dNx[:, :, :, N_idx])
+    B[:, :, :, B_dN_n_rows, B_dN_n_cols] = dNx[:, :, :, dN_idx]
+
+    print 'B', B.shape
+
+    K = np.einsum('i,einsd,st', w_ip, B, D_el)
 
     #=========================================================================
     # System matrix
@@ -102,15 +182,16 @@ if __name__ == '__main__':
     K = np.einsum('i,einsd,st,eimtf,ei->endmf', w_ip, B, D_el, B, J_det)
     K_mtx = SysMtxAssembly()
     K_mtx.add_mtx_array(K.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
-
+    print 'K', K_mtx
     #=========================================================================
     # Load vector
     #=========================================================================
 
     R = np.zeros((n_dofs,), dtype='float_')
-    R[[8, 10]] = 1.0
+
+    R[3] = 1.0
     K_mtx.register_constraint(a=0)
     K_mtx.register_constraint(a=1)
-    K_mtx.register_constraint(a=2)
     u = K_mtx.solve(R)
+    print 'K_mtx', K_mtx
     print 'u', u

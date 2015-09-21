@@ -23,7 +23,7 @@ if __name__ == '__main__':
                             mats_phase2=MATS1DElastic(E=20.),
                             mats_ifslip=MATS1DElastic(E=5.),
                             mats_ifopen=MATS1DElastic(E=1.))
-    D_el = np.diag(np.array([10., 5., 1., 20.]))
+    D_el = np.diag(np.array([10., 0.1, 1., 10.]))
     n_s = D_el.shape[0]
 
     #=========================================================================
@@ -38,12 +38,12 @@ if __name__ == '__main__':
     #[ d, i]
     r_ip = fets_eval.ip_coords[:, :-1].T
     # [ i ]
-    w_ip = fets_eval.ip_weights
+    w_ip = fets_eval.ip_weights.flatten()
     # [ d, n ]
     geo_r = fets_eval.geo_r.T
     # [ d, n, i ]
     dNr_geo = geo_r[
-        :, :, None] * (1 + np.flipud(r_ip)[:, None, :] * np.flipud(geo_r)[:, :, None]) / 4.0
+        :,:, None] * (1 + np.flipud(r_ip)[:, None,:] * np.flipud(geo_r)[:,:, None]) / 4.0
     # [ i, n, d ]
     dNr_geo = np.einsum('dni->ind', dNr_geo)
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     #=========================================================================
 
     # Number of elements
-    n_e_x = 2
+    n_e_x = 1
     n_e_y = 1
     # length
     L_x = 20.0
@@ -79,11 +79,15 @@ if __name__ == '__main__':
     J_det = np.linalg.det(J_mtx)
 
     # shape function for the unknowns
-    # [ n_geo_r, n_ip]
-    Nr = 0.5 * (1. + geo_r[0, :, None] * r_ip[None, 0])
-    dNr = 0.5 * geo_r[0, :, None]
+    # [d, n, i]
+    Nr = 0.5 * (1. + geo_r[None, 0,:, None]
+                * r_ip[None, None, 0]) * np.array([[1], [ 1]])[:,:, None]
+    dNr = 0.5 * geo_r[None, 0,:, None]*np.array([1, -1]) * np.array([[1], [ 1]])[:,:, None]    
+    # [ i, n, d ]
+    Nr = np.einsum('dni->ind', Nr)
+    dNr = np.einsum('dni->ind', dNr)
 
-    print geo_r[0, :]
+    print geo_r[0,:]
     print 'Nr', Nr
     print Nr.shape
     print 'dNr', dNr
@@ -92,9 +96,27 @@ if __name__ == '__main__':
     # [ n_e, n_ip, n_dof_r, n_dim_dof ]
     dNx = np.einsum('eidf,inf->eind', J_inv, dNr)
 
+    print 'dNx', dNx.shape
+    print 'dNx', dNx
+
+    B_N_factor = np.array([[1, 1],
+                           [1, 1],
+                           [-1, -1],
+                           [-1, -1]])
+
+    print Nr[:,:, [0, 0]]*B_N_factor
+
     B = np.zeros((n_e, n_ip, n_dof_r, n_s, n_dim_dof), dtype='f')
-    B_n_rows, B_n_cols = [0, 1, 2], [0, 0, 1]
-    B[:, :, 0, B_n_rows, B_n_cols] = dNx[:, :, 0, 0],
+    B_N_rows, B_N_cols = [1, 2], [0, 1]
+    B[:,:,:, B_N_rows, B_N_cols] = Nr[:,:, [0, 0]]*B_N_factor
+
+    B[:,:, [0, 1], 0, 0] = dNx[:, 0, [0, 1], 0]
+    B[:,:, [2, 3], 3, 0] = dNx[:, 0, [2, 3], 0]
+
+    print B
+
+#     B_n_rows, B_n_cols = [0, 1, 2], [0, 0, 1]
+#     B[:,:, 0, B_n_rows, B_n_cols] = dNx[:,:, 0, 0],
 
     #=========================================================================
     # System matrix
@@ -108,7 +130,8 @@ if __name__ == '__main__':
     #=========================================================================
 
     R = np.zeros((n_dofs,), dtype='float_')
-    R[[8, 10]] = 1.0
+    print R
+    R[6] = 1.0
     K_mtx.register_constraint(a=0)
     K_mtx.register_constraint(a=1)
     K_mtx.register_constraint(a=2)

@@ -17,6 +17,7 @@ import numpy as np
 
 
 class FETS1D52ULRH(FETSEval):
+
     '''
     Fe Bar 2 nodes, deformation
     '''
@@ -83,7 +84,7 @@ if __name__ == '__main__':
     #=========================================================================
     # Material matrix
     #=========================================================================
-    D_el = np.diag(np.array([10., 5., 10.]))
+    D_el = np.diag(np.array([10., 0.1, 10.]))
     n_s = D_el.shape[0]
 
     #=========================================================================
@@ -98,24 +99,21 @@ if __name__ == '__main__':
 
     #[ d, i]
     r_ip = fets_eval.ip_coords[:, :-2].T
-    print 'r_ip', r_ip.shape
     # [ i ]
     w_ip = fets_eval.ip_weights
     # [ d, n ]
     geo_r = fets_eval.geo_r.T
     # [ d, n, i ]
-    dNr_geo = (geo_r[:, :, None] * (1 + r_ip[:, None, :]
-                                    * geo_r[:, :, None]) / 4.0)
+    dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
     # [ i, n, d ]
     dNr_geo = np.einsum('dni->ind', dNr_geo)
-    print 'Dnr_geo', dNr_geo.shape
 
     #=========================================================================
     # Discretization
     #=========================================================================
 
     # Number of elements
-    n_e_x = 1
+    n_e_x = 10
     # length
     L_x = 20.0
     # [ r, i ]
@@ -127,54 +125,34 @@ if __name__ == '__main__':
     # element array with nodal coordinates
     # [ n_e, n_geo_r, n_dim_geo ]
     elem_x_map = domain.elem_X_map
-    print 'elem_x_map', elem_x_map
     # [ n_e, n_dof_r, n_dim_dof ]
     elem_dof_map = domain.elem_dof_map
 #     print 'elem_dof_map', elem_dof_map
 
     # [ n_e, n_ip, n_dim_geo, n_dim_geo ]
     J_mtx = np.einsum('ind,enf->eidf', dNr_geo, elem_x_map)
-    print 'J_mtx', J_mtx.shape
     J_inv = np.linalg.inv(J_mtx)
-    print 'J_inv', J_inv.shape
     J_det = np.linalg.det(J_mtx)
 
     # shape function for the unknowns
-    # [ n_geo_r, n_ip]
+    # [ d, n, i]
     Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None, :])
-    dNr = 0.5 * geo_r[:, :, None]
+    dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
 
-    print geo_r[0, :]
-    print 'Nr', Nr
-    print Nr.shape
-    print 'dNr', dNr
-    print dNr.shape
-
+    # [ i, n, d ]
+    Nr = np.einsum('dni->ind', Nr)
+    dNr = np.einsum('dni->ind', dNr)
     Nx = Nr
     # [ n_e, n_ip, n_dof_r, n_dim_dof ]
     dNx = np.einsum('eidf,inf->eind', J_inv, dNr)
 
     B = np.zeros((n_e, n_ip, n_dof_r, n_s, n_dim_dof), dtype='f')
-    print 'B', B.shape
-
     B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
     B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
-
     B_factors = np.array([1, -1], dtype='float_')
-
-    print B_N_n_cols
-    print B_N_n_rows
-    print 'B', B.shape
-
-    print N_idx
-    print 'dNx', dNx.shape
-    B[:, :, :, B_N_n_rows, B_N_n_cols] = (B_factors[None, None, None, :] *
-                                          dNx[:, :, :, N_idx])
+    B[:, :, :, B_N_n_rows, B_N_n_cols] = (B_factors[None, None, :] *
+                                          Nx[:, :, N_idx])
     B[:, :, :, B_dN_n_rows, B_dN_n_cols] = dNx[:, :, :, dN_idx]
-
-    print 'B', B.shape
-
-    K = np.einsum('i,einsd,st', w_ip, B, D_el)
 
     #=========================================================================
     # System matrix
@@ -182,16 +160,12 @@ if __name__ == '__main__':
     K = np.einsum('i,einsd,st,eimtf,ei->endmf', w_ip, B, D_el, B, J_det)
     K_mtx = SysMtxAssembly()
     K_mtx.add_mtx_array(K.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
-    print 'K', K_mtx
+
     #=========================================================================
     # Load vector
     #=========================================================================
-
     R = np.zeros((n_dofs,), dtype='float_')
-
-    R[3] = 1.0
+    R[2 * n_e_x + 1] = 1.0
     K_mtx.register_constraint(a=0)
-    K_mtx.register_constraint(a=1)
     u = K_mtx.solve(R)
-    print 'K_mtx', K_mtx
     print 'u', u

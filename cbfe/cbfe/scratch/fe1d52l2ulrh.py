@@ -6,7 +6,6 @@ Created on Sep 12, 2015
 '''
 from envisage.ui.workbench.api import WorkbenchApplication
 from mayavi.sources.api import VTKDataSource, VTKFileReader
-
 from traits.api import implements, Int, Array
 from ibvpy.fets.fets_eval import FETSEval, IFETSEval
 from ibvpy.mats.mats1D import MATS1DElastic
@@ -14,6 +13,7 @@ from ibvpy.mats.mats1D5.mats1D5_bond import MATS1D5Bond
 from ibvpy.mesh.fe_grid import FEGrid
 from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class FETS1D52ULRH(FETSEval):
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     # [ d, n ]
     geo_r = fets_eval.geo_r.T
     # [ d, n, i ]
-    dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
+    dNr_geo = geo_r[:,:, None] * np.array([1, 1]) * 0.5
     # [ i, n, d ]
     dNr_geo = np.einsum('dni->ind', dNr_geo)
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     #=========================================================================
 
     # Number of elements
-    n_e_x = 10
+    n_e_x = 200
     # length
     L_x = 20.0
     # [ r, i ]
@@ -125,6 +125,7 @@ if __name__ == '__main__':
     # element array with nodal coordinates
     # [ n_e, n_geo_r, n_dim_geo ]
     elem_x_map = domain.elem_X_map
+#     print elem_x_map
     # [ n_e, n_dof_r, n_dim_dof ]
     elem_dof_map = domain.elem_dof_map
 #     print 'elem_dof_map', elem_dof_map
@@ -136,8 +137,8 @@ if __name__ == '__main__':
 
     # shape function for the unknowns
     # [ d, n, i]
-    Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None, :])
-    dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
+    Nr = 0.5 * (1. + geo_r[:,:, None] * r_ip[None,:])
+    dNr = 0.5 * geo_r[:,:, None] * np.array([1, 1])
 
     # [ i, n, d ]
     Nr = np.einsum('dni->ind', Nr)
@@ -149,10 +150,10 @@ if __name__ == '__main__':
     B = np.zeros((n_e, n_ip, n_dof_r, n_s, n_dim_dof), dtype='f')
     B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
     B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
-    B_factors = np.array([1, -1], dtype='float_')
-    B[:, :, :, B_N_n_rows, B_N_n_cols] = (B_factors[None, None, :] *
-                                          Nx[:, :, N_idx])
-    B[:, :, :, B_dN_n_rows, B_dN_n_cols] = dNx[:, :, :, dN_idx]
+    B_factors = np.array([-1, 1], dtype='float_')
+    B[:,:,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
+                                          Nx[:,:, N_idx])
+    B[:,:,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
 
     #=========================================================================
     # System matrix
@@ -162,10 +163,75 @@ if __name__ == '__main__':
     K_mtx.add_mtx_array(K.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
 
     #=========================================================================
-    # Load vector
+    # BC and solver
     #=========================================================================
     R = np.zeros((n_dofs,), dtype='float_')
-    R[2 * n_e_x + 1] = 1.0
+#     R[2 * n_e_x + 1] = 1.0
     K_mtx.register_constraint(a=0)
+    K_mtx.register_constraint(a=2 * n_e_x + 1, u_a=1.0)
     u = K_mtx.solve(R)
     print 'u', u
+
+    #=========================================================================
+    # strain and slip
+    #=========================================================================
+    u_e = u[elem_dof_map]
+    #[n_e, n_dof_r, n_dim_dof]
+    u_n = u_e.reshape(n_e, n_dof_r, n_dim_dof)
+    #[n_e, n_ip, n_s]
+    eps = np.einsum('einsd,end->eis', B, u_n)
+
+    #=========================================================================
+    # stress and shear flow
+    #=========================================================================
+    #[n_e, n_ip, n_s]
+    sig = eps * np.diag(D_el)
+
+    #=========================================================================
+    # visualization
+    #=========================================================================
+    # deformation
+    deform = plt.subplot(421)
+    n_coord = np.unique(elem_x_map)
+    plt.plot(n_coord + u[0::2], np.zeros_like(u[0::2]), 'b', marker='.')
+    plt.plot(n_coord + u[1::2], np.ones_like(u[0::2]), 'g', marker='.')
+    plt.ylim((-1, 2))
+    deform.axes.get_yaxis().set_visible(False)
+    deform.set_title('deformation')
+
+    # coordinates of the integration points
+    ip_coord = np.einsum('end,ind->ei', elem_x_map, Nr)
+    ip_coord = ip_coord.flatten()
+
+    # matrix strain
+    m_strain = plt.subplot(423)
+    plt.plot(ip_coord, eps[:,:, 0].flatten(), 'b')
+    m_strain.set_title('matrix strain')
+
+    # fiber strain
+    f_strain = plt.subplot(425)
+    plt.plot(ip_coord, eps[:,:, 2].flatten(), 'g')
+    f_strain.set_title('fiber strain')
+
+    # slip
+    slip = plt.subplot(427)
+    plt.plot(ip_coord, eps[:,:, 1].flatten(), 'k')
+    slip.set_title('slip')
+
+    # matrix stress
+    m_stress = plt.subplot(424)
+    plt.plot(ip_coord, sig[:,:, 0].flatten(), 'b')
+    m_stress.set_title('matrix stress')
+
+    # fiber stress
+    f_stress = plt.subplot(426)
+    plt.plot(ip_coord, sig[:,:, 2].flatten(), 'g')
+    f_stress.set_title('fiber stress')
+
+    # shear
+    shear = plt.subplot(428)
+    plt.plot(ip_coord, sig[:,:, 1].flatten(), 'K')
+    shear.set_title('shear flow')
+
+    plt.subplots_adjust(bottom=0.05, top=0.95, hspace=0.25)
+    plt.show()

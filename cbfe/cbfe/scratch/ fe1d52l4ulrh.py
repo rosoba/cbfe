@@ -125,6 +125,8 @@ if __name__ == '__main__':
     K_mtx = SysMtxAssembly()
     K_mtx.add_mtx_array(K.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
 
+    print K_mtx
+
     #=========================================================================
     # Load vector
     #=========================================================================

@@ -1,13 +1,14 @@
-import numpy as np
 from envisage.ui.workbench.api import WorkbenchApplication
 from mayavi.sources.api import VTKDataSource, VTKFileReader
 from traits.api import implements, Int, Array
+
 from ibvpy.fets.fets_eval import FETSEval, IFETSEval
 from ibvpy.mats.mats1D import MATS1DElastic
 from ibvpy.mats.mats1D5.mats1D5_bond import MATS1D5Bond
 from ibvpy.mesh.fe_grid import FEGrid
 from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class FETS1D52ULRH(FETSEval):
@@ -131,7 +132,7 @@ if __name__ == '__main__':
 
     # shape function for the unknowns
     # [ d, n, i]
-    Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None,:])
+    Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None, :])
     dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
 
     # [ i, n, d ]
@@ -145,9 +146,9 @@ if __name__ == '__main__':
     B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
     B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
     B_factors = np.array([-1, 1], dtype='float_')
-    B[:, :,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
+    B[:, :, :, B_N_n_rows, B_N_n_cols] = (B_factors[None, None, :] *
                                           Nx[:, :, N_idx])
-    B[:, :,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
+    B[:, :, :, B_dN_n_rows, B_dN_n_cols] = dNx[:, :, :, dN_idx]
 
     #=========================================================================
     # System matrix
@@ -170,7 +171,7 @@ if __name__ == '__main__':
     # internal force
     #=========================================================================
 
-    def f_inter(u, fixed):
+    def get_corr_pred(u, fixed):
         # strain and slip
         u_e = u[elem_dof_map]
         #[n_e, n_dof_r, n_dim_dof]
@@ -204,8 +205,8 @@ if __name__ == '__main__':
     tstep = 0.1
     tmax = 1.0
 
-    # current force
-    F = np.zeros(n_dofs)
+    # external force
+    F_ext = np.zeros(n_dofs)
 
     # maximum force
     F_max = np.zeros(n_dofs)
@@ -218,7 +219,7 @@ if __name__ == '__main__':
     while t <= tmax:
 
         t += tstep
-        F += tstep * F_max
+        F_ext += tstep * F_max
 
         k = 0
         step_flag = 'predictor'
@@ -227,7 +228,7 @@ if __name__ == '__main__':
 
             K = K_mtx
 
-            R = F - f_inter(U_k, 0)
+            R = F_ext - get_corr_pred(U_k, 0)
 
             if np.linalg.norm(R) < tolerance:
                 break
@@ -240,7 +241,7 @@ if __name__ == '__main__':
             step_flag = 'corrector'
 
         U_record = np.vstack((U_record, U_k))
-        F_record = np.vstack((F_record, F))
+        F_record = np.vstack((F_record, F_ext))
 
 #         print U_record[:, 5]
 #         print F_record[:, 5]

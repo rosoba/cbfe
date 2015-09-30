@@ -1,3 +1,5 @@
+from envisage.ui.workbench.api import WorkbenchApplication
+from mayavi.sources.api import VTKDataSource, VTKFileReader
 
 from traits.api import implements, Int, Array, HasTraits, Instance, \
     Property, cached_property, Constant, Float
@@ -91,37 +93,34 @@ class FETS1D52ULRH(FETSEval):
 
 
 class TStepper(HasTraits):
+
     '''Time stepper object for non-linear Newton-Raphson solver.
     '''
 
-    mats_eval = Property(Instance(FEGrid))
+    mats_eval = Property(Instance(MATSEval))
     '''Finite element formulation object.
     '''
     @cached_property
-    def get_mats_eval(self):
+    def _get_mats_eval(self):
         return MATSEval()
 
-    fets_eval = Property(Instance(FEGrid))
+    fets_eval = Property(Instance(FETS1D52ULRH))
     '''Finite element formulation object.
     '''
     @cached_property
-    def get_fets_eval(self):
+    def _get_fets_eval(self):
         return FETS1D52ULRH()
 
     domain = Property(Instance(FEGrid))
     '''Diescretization object.
     '''
     @cached_property
-    def get_domain(self):
+    def _get_domain(self):
         # Number of elements
         n_e_x = 2
         # length
         L_x = 20.0
-        # [ r, i ]
-        #======================================================================
         # Element definition
-        #======================================================================
-
         domain = FEGrid(coord_max=(L_x,),
                         shape=(n_e_x,),
                         fets_eval=self.fets_eval)
@@ -146,7 +145,11 @@ class TStepper(HasTraits):
         J_mtx = np.einsum('ind,enf->eidf', dNr_geo, elem_x_map)
         return J_mtx
 
-    def get_B_mtx(self, U, t):
+    B = Property
+    '''The B matrix
+    '''
+
+    def _get_B(self):
         '''Calculate and assemble the system stiffness matrix.
         '''
         mats_eval = self.mats_eval
@@ -207,33 +210,35 @@ class TStepper(HasTraits):
     # internal force
     #=========================================================================
 
-    def get_corr_pred(self, U, fixed):
+    def get_corr_pred(self, U, t, F_ext, fixed):
         # strain and slip
         mats_eval = self.mats_eval
         fets_eval = self.fets_eval
         domain = self.domain
         elem_dof_map = domain.elem_dof_map
         n_e = domain.n_active_elems
-        u_e = U[elem_dof_map]
         n_dof_r, n_dim_dof = self.fets_eval.dof_r.shape
+        n_dim_dof = 2
+        n_dofs = domain.n_dofs
 
         n_el_dofs = n_dof_r * n_dim_dof
         # [ i ]
         w_ip = fets_eval.ip_weights
 
-        D = mats_eval.get_D(U)
+        # stiffness matrix
+        D = mats_eval.get_D(U, t)
         J_det = np.linalg.det(self.J_mtx)
-
         K = np.einsum('i,einsd,st,eimtf,ei->endmf',
                       w_ip, self.B, D, self.B, J_det)
         K_mtx = SysMtxAssembly()
         K_mtx.add_mtx_array(K.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
+        K_mtx.register_constraint(a=fixed)
 
+        u_e = U[elem_dof_map]
         #[n_e, n_dof_r, n_dim_dof]
         u_n = u_e.reshape(n_e, n_dof_r, n_dim_dof)
         #[n_e, n_ip, n_s]
         eps = np.einsum('einsd,end->eis', self.B, u_n)
-
         # stress and shear flow
         #[n_e, n_ip, n_s]
         sig = eps * np.diag(D)
@@ -241,66 +246,119 @@ class TStepper(HasTraits):
         # [n_e, n_n, n_dim_dof]
         f_inter_e = np.einsum('eis,einsd,ei->end', sig, self.B, J_det)
         f_inter_e = f_inter_e.reshape(n_e, n_dof_r * n_dim_dof)
-        f_inter = np.zeros(n_dofs)
-        np.add.at(f_inter, elem_dof_map, f_inter_e)
+        F_inter = np.zeros(n_dofs)
+        np.add.at(F_inter, elem_dof_map, f_inter_e)
         # fixed dof
-        f_inter[fixed] = 0.
-        return f_inter
+        F_inter[fixed] = 0.
+        return F_ext - F_inter, K_mtx
+
+
+class TLoop(HasTraits):
+
+    ts = Instance(TStepper)
+    tstep = Float(0.1)
+    t_max = Float(1.0)
+    k_max = Int(10)
+    F_max = Array
+    tolerance = Float(1e-4)
+
+    def eval(self):
+        t = 0.
+        n_dofs = self.ts.domain.n_dofs
+        U_record = np.zeros(n_dofs)
+        F_record = np.zeros(n_dofs)
+        F_ext = np.zeros(n_dofs)
+        U_k = np.zeros(n_dofs)
+
+        while t <= self.t_max:
+            t += self.tstep
+            F_ext += self.tstep * self.F_max
+            k = 0
+            step_flag = 'predictor'
+            while k < self.k_max:
+                R, K = ts.get_corr_pred(U_k, t, F_ext, 0)
+                if np.linalg.norm(R) < self.tolerance:
+                    break
+                K.apply_constraints(R)
+                d_U = K.solve()
+                U_k += d_U
+                k += 1
+                step_flag = 'corrector'
+            U_record = np.vstack((U_record, U_k))
+            F_record = np.vstack((F_record, F_ext))
+        return U_record, F_record
+
+if __name__ == '__main__':
 
     #=========================================================================
     # nonlinear solver
     #=========================================================================
     # initialization
-    KMAX = 10
-    tolerance = 10e-4
-    U_k = np.zeros(n_dofs)
 
-    # time step parameters
-    t = 0.
-    tstep = 0.1
-    tmax = 1.0
+    ts = TStepper()
 
-    # external force
-    F_ext = np.zeros(n_dofs)
-
-    # maximum force
+    n_dofs = ts.domain.n_dofs
     F_max = np.zeros(n_dofs)
-    F_max[2 * n_e_x + 1] = 1.0
-
-    # for visualization
-    U_record = np.zeros(n_dofs)
-    F_record = np.zeros(n_dofs)
-
-    while t <= tmax:
-
-        t += tstep
-        F_ext += tstep * F_max
-
-        k = 0
-        step_flag = 'predictor'
-
-        while k < KMAX:
-
-            K = K_mtx
-
-            R = F_ext - get_corr_pred(U_k, 0)
-
-            if np.linalg.norm(R) < tolerance:
-                break
-
-            K.apply_constraints(R)
-            d_U = K.solve()
-
-            U_k += d_U
-            k += 1
-            step_flag = 'corrector'
-
-        U_record = np.vstack((U_record, U_k))
-        F_record = np.vstack((F_record, F_ext))
-
-#         print U_record[:, 5]
-#         print F_record[:, 5]
+    F_max[-1] = 1.0
+    tl = TLoop(ts=ts,
+               F_max=F_max)
+    U_record, F_record = tl.eval()
     plt.plot(U_record[:, 5], F_record[:, 5], marker='o')
     plt.xlabel('displacement')
     plt.ylabel('force')
     plt.show()
+
+#     n_dofs = ts.domain.n_dofs
+#
+#     KMAX = 10
+#     tolerance = 10e-4
+#     U_k = np.zeros(n_dofs)
+#
+# time step parameters
+#     t = 0.
+#     tstep = 0.1
+#     tmax = 1.0
+#
+# external force
+#     F_ext = np.zeros(n_dofs)
+#
+# maximum force
+#     n_e_x = ts.domain.shape[0]
+#     F_max = np.zeros(n_dofs)
+#     F_max[2 * n_e_x + 1] = 1.0
+#
+# for visualization
+#     U_record = np.zeros(n_dofs)
+#     F_record = np.zeros(n_dofs)
+#
+#     while t <= tmax:
+#
+#         t += tstep
+#         F_ext += tstep * F_max
+#
+#         k = 0
+#         step_flag = 'predictor'
+#
+#         while k < KMAX:
+#
+#             R, K = ts.get_corr_pred(U_k, t, F_ext, 0)
+#
+#             if np.linalg.norm(R) < tolerance:
+#                 break
+#
+#             K.apply_constraints(R)
+#             d_U = K.solve()
+#
+#             U_k += d_U
+#             k += 1
+#             step_flag = 'corrector'
+#
+#         U_record = np.vstack((U_record, U_k))
+#         F_record = np.vstack((F_record, F_ext))
+#
+# print U_record[:, 5]
+# print F_record[:, 5]
+#     plt.plot(U_record[:, 5], F_record[:, 5], marker='o')
+#     plt.xlabel('displacement')
+#     plt.ylabel('force')
+#     plt.show()

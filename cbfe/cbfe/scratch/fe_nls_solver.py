@@ -2,8 +2,9 @@ from envisage.ui.workbench.api import WorkbenchApplication
 from mayavi.sources.api import VTKDataSource, VTKFileReader
 
 from traits.api import implements, Int, Array, HasTraits, Instance, \
-    Property, cached_property, Constant, Float
+    Property, cached_property, Constant, Float, List
 
+from ibvpy.api import BCDof
 from ibvpy.fets.fets_eval import FETSEval, IFETSEval
 from ibvpy.mats.mats1D import MATS1DElastic
 from ibvpy.mats.mats1D5.mats1D5_bond import MATS1D5Bond
@@ -23,8 +24,10 @@ class MATSEval(HasTraits):
 
     G = Float(0.1, tooltip='Bond stiffness')
 
-    def get_D(self, u, t):
-        return np.diag(np.array([self.E_m, self.G, self.E_f]))
+    def get_corr_pred(self, eps, t_n, t_n1):
+        D = np.diag(np.array([self.E_m, self.G, self.E_f]))
+        sig = np.einsum('...st,...t->...s', D, eps)
+        return sig, D
 
     n_s = Constant(3)
 
@@ -42,7 +45,6 @@ class FETS1D52ULRH(FETSEval):
     # Dimensional mapping
     dim_slice = slice(0, 1)
 
-    n_e_dofs = Int(4)
     n_nodal_dofs = Int(2)
 
     dof_r = Array(value=[[-1], [1]])
@@ -50,6 +52,20 @@ class FETS1D52ULRH(FETSEval):
     vtk_r = Array(value=[[-1.], [1.]])
     vtk_cells = [[0, 1]]
     vtk_cell_types = 'Line'
+
+    n_dof_r = Property
+    '''Number of node positions associated with degrees of freedom. 
+    '''
+    @cached_property
+    def _get_n_dof_r(self):
+        return len(self.dof_r)
+
+    n_e_dofs = Property
+    '''Number of element degrees
+    '''
+    @cached_property
+    def _get_n_dofs(self):
+        return self.n_nodal_dofs * self.n_dof_r
 
     def _get_ip_coords(self):
         offset = 1e-6
@@ -126,6 +142,8 @@ class TStepper(HasTraits):
                         fets_eval=self.fets_eval)
         return domain
 
+    bc_list = List(Instance(BCDof))
+
     J_mtx = Property
     '''Array of Jacobian matrices.
     '''
@@ -145,10 +163,17 @@ class TStepper(HasTraits):
         J_mtx = np.einsum('ind,enf->eidf', dNr_geo, elem_x_map)
         return J_mtx
 
+    J_det = Property
+    '''Array of Jacobi determinants.
+    '''
+    @cached_property
+    def _get_J_det(self):
+        return np.linalg.det(self.J_mtx)
+
     B = Property
     '''The B matrix
     '''
-
+    @cached_property
     def _get_B(self):
         '''Calculate and assemble the system stiffness matrix.
         '''
@@ -158,8 +183,9 @@ class TStepper(HasTraits):
 
         n_s = mats_eval.n_s
 
-        n_dof_r, n_dim_dof = fets_eval.dof_r.shape
-        n_dim_dof = 2
+        n_dof_r = fets_eval.n_dof_r
+        n_nodal_dofs = fets_eval.n_nodal_dofs
+
         n_ip = fets_eval.n_gp
         n_e = domain.n_active_elems
         #[ d, i]
@@ -185,7 +211,7 @@ class TStepper(HasTraits):
         # [ n_e, n_ip, n_dof_r, n_dim_dof ]
         dNx = np.einsum('eidf,inf->eind', J_inv, dNr)
 
-        B = np.zeros((n_e, n_ip, n_dof_r, n_s, n_dim_dof), dtype='f')
+        B = np.zeros((n_e, n_ip, n_dof_r, n_s, n_nodal_dofs), dtype='f')
         B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
         B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
         B_factors = np.array([-1, 1], dtype='float_')
@@ -195,97 +221,98 @@ class TStepper(HasTraits):
 
         return B
 
-    def apply_constraints(self, K_mtx, F_ext):
-        '''Insert boundary conditions into the system matrix and rhs vector. 
+    def apply_essential_bc(self):
+        '''Insert initial boundary conditions at the start up of the calculation.. 
         '''
-        n_dofs = self.domain.n_dofs
+        self.K = SysMtxAssembly()
+        for bc in self.bc_list:
+            bc.apply_essential(self.K)
 
-        R = np.zeros((n_dofs,), dtype='float_')
+    def apply_bc(self, step_flag, K_mtx, F_ext, t_n, t_n1):
+        '''Apply boundary conditions for the current load increement
+        '''
+        for bc in self.bc_list:
+            bc.apply(step_flag, None, K_mtx, F_ext, t_n, t_n1)
 
-        n_e_x = self.domain.shape[0]
-        R[2 * n_e_x + 1] = 1.0
-        K_mtx.register_constraint(a=0)
-
-    #=========================================================================
-    # internal force
-    #=========================================================================
-
-    def get_corr_pred(self, U, t, F_ext, fixed):
-        # strain and slip
+    def get_corr_pred(self, step_flag, U, d_U, t_n, t_n1):
+        '''Function calculationg the residuum and tangent operator.
+        '''
         mats_eval = self.mats_eval
         fets_eval = self.fets_eval
         domain = self.domain
         elem_dof_map = domain.elem_dof_map
         n_e = domain.n_active_elems
         n_dof_r, n_dim_dof = self.fets_eval.dof_r.shape
-        n_dim_dof = 2
-        n_dofs = domain.n_dofs
-
-        n_el_dofs = n_dof_r * n_dim_dof
+        n_nodal_dofs = self.fets_eval.n_nodal_dofs
+        n_el_dofs = n_dof_r * n_nodal_dofs
         # [ i ]
         w_ip = fets_eval.ip_weights
 
-        # stiffness matrix
-        D = mats_eval.get_D(U, t)
-        J_det = np.linalg.det(self.J_mtx)
-        K = np.einsum('i,einsd,st,eimtf,ei->endmf',
-                      w_ip, self.B, D, self.B, J_det)
-        K_mtx = SysMtxAssembly()
-        K_mtx.add_mtx_array(K.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
-        K_mtx.register_constraint(a=fixed)
-
         u_e = U[elem_dof_map]
         #[n_e, n_dof_r, n_dim_dof]
-        u_n = u_e.reshape(n_e, n_dof_r, n_dim_dof)
+        u_n = u_e.reshape(n_e, n_dof_r, n_nodal_dofs)
         #[n_e, n_ip, n_s]
         eps = np.einsum('einsd,end->eis', self.B, u_n)
-        # stress and shear flow
-        #[n_e, n_ip, n_s]
-        sig = eps * np.diag(D)
-        # internal force
+
+        # material response state variables at integration point
+        sig, D = mats_eval.get_corr_pred(eps, t_n, t_n1)
+
+        # system matrix
+        self.K.reset_mtx()
+        Ke = np.einsum('i,einsd,st,eimtf,ei->endmf',
+                       w_ip, self.B, D, self.B, self.J_det)
+
+        self.K.add_mtx_array(
+            Ke.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
+
+        # internal forces
         # [n_e, n_n, n_dim_dof]
-        f_inter_e = np.einsum('eis,einsd,ei->end', sig, self.B, J_det)
-        f_inter_e = f_inter_e.reshape(n_e, n_dof_r * n_dim_dof)
-        F_inter = np.zeros(n_dofs)
-        np.add.at(F_inter, elem_dof_map, f_inter_e)
-        # fixed dof
-        F_inter[fixed] = 0.
-        return F_ext - F_inter, K_mtx
+        Fe_int = np.einsum('i,eis,einsd,ei->end',
+                           w_ip, sig, self.B, self.J_det)
+        F_int = -np.bincount(elem_dof_map.flatten(), weights=Fe_int.flatten())
+
+        self.apply_bc(step_flag, self.K, F_int, t_n, t_n1)
+
+        return F_int, self.K
 
 
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    tstep = Float(0.1)
+    d_t = Float(0.1)
     t_max = Float(1.0)
     k_max = Int(10)
-    F_max = Array
     tolerance = Float(1e-4)
 
     def eval(self):
-        t = 0.
+
+        ts.apply_essential_bc()
+
+        t_n = 0.
+        t_n1 = t_n
         n_dofs = self.ts.domain.n_dofs
         U_record = np.zeros(n_dofs)
         F_record = np.zeros(n_dofs)
-        F_ext = np.zeros(n_dofs)
         U_k = np.zeros(n_dofs)
+        d_U = np.zeros(n_dofs)
 
-        while t <= self.t_max:
-            t += self.tstep
-            F_ext += self.tstep * self.F_max
+        while t_n1 <= self.t_max:
             k = 0
             step_flag = 'predictor'
             while k < self.k_max:
-                R, K = ts.get_corr_pred(U_k, t, F_ext, 0)
+                R, K = ts.get_corr_pred(step_flag, U_k, d_U, t_n, t_n1)
+                K.apply_constraints(R)
                 if np.linalg.norm(R) < self.tolerance:
                     break
-                K.apply_constraints(R)
                 d_U = K.solve()
                 U_k += d_U
                 k += 1
                 step_flag = 'corrector'
             U_record = np.vstack((U_record, U_k))
-            F_record = np.vstack((F_record, F_ext))
+            #F_record = np.vstack((F_record, F_ext))
+
+            t_n = t_n1
+            t_n1 = t_n + self.d_t
         return U_record, F_record
 
 if __name__ == '__main__':
@@ -298,15 +325,18 @@ if __name__ == '__main__':
     ts = TStepper()
 
     n_dofs = ts.domain.n_dofs
-    F_max = np.zeros(n_dofs)
-    F_max[-1] = 1.0
-    tl = TLoop(ts=ts,
-               F_max=F_max)
+
+    ts.bc_list = [BCDof(var='u', dof=0, value=0.0),
+                  BCDof(var='u', dof=n_dofs - 1, value=1.0)]
+
+    tl = TLoop(ts=ts)
+
     U_record, F_record = tl.eval()
-    plt.plot(U_record[:, 5], F_record[:, 5], marker='o')
-    plt.xlabel('displacement')
-    plt.ylabel('force')
-    plt.show()
+    print 'U_record', U_record
+#     plt.plot(U_record[:, 5], F_record[:, 5], marker='o')
+#     plt.xlabel('displacement')
+#     plt.ylabel('force')
+#     plt.show()
 
 #     n_dofs = ts.domain.n_dofs
 #

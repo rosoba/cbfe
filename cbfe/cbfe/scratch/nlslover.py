@@ -243,6 +243,7 @@ if __name__ == '__main__':
         U_record = np.vstack((U_record, U_k))
         F_record = np.vstack((F_record, F_ext))
 
+    print U_record[:, 5]
     plt.plot(U_record[:, 5], F_record[:, 5], marker='o')
     plt.xlabel('displacement')
     plt.ylabel('force')

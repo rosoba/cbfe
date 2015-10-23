@@ -12,6 +12,7 @@ from ibvpy.mesh.fe_grid import FEGrid
 from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
 
 class MATSEval(HasTraits):
@@ -22,12 +23,51 @@ class MATSEval(HasTraits):
     E_f = Float(10, tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
-    G = Float(0.1, tooltip='Bond stiffness')
+    E_b = Float(0.1, tooltip='Bond stiffness')
 
-    def get_corr_pred(self, eps, t_n, t_n1):
-        D = np.diag(np.array([self.E_m, self.G, self.E_f]))
-        sig = np.einsum('...st,...t->...s', D, eps)
-        return sig, D
+    sigma_y = Float(0.05,
+                    label="sigma_y",
+                    desc="Yield stress",
+                    enter_set=True,
+                    auto_set=False)
+
+    K_bar = Float(0.01,  # 191e-6,
+                  label="K",
+                  desc="Plasticity modulus",
+                  enter_set=True,
+                  auto_set=False)
+
+    H_bar = Float(0.0,  # 191e-6,
+                  label="H",
+                  desc="Hardening modulus",
+                  enter_set=True,
+                  auto_set=False)
+
+    def get_G(self, slip):
+        #         return 0.1
+        #         print 'slip', slip
+        return np.maximum(0.1 - 0.1 * slip, -0.005)
+
+    def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1, alpha, q):
+        n_e, n_ip, n_s = eps.shape
+        D = np.zeros((n_e, n_ip, 3, 3))
+        D[:, :, 0, 0] = self.E_m
+        D[:, :, 2, 2] = self.E_f
+        sig_trial = sig[:, :, 1] + self.E_b * d_eps[:,:, 1]
+        xi_trial = sig_trial - q
+        f_trial = abs(xi_trial) - (self.sigma_y + self.K_bar * alpha)
+        elas = f_trial <= 1e-8
+        plas = f_trial > 1e-8
+        E_p = ( self.E_b * ( self.K_bar + self.H_bar ) ) / \
+            (self.E_b + self.K_bar + self.H_bar)
+        D[:, :, 1, 1] = self.E_b*elas + E_p*plas
+        d_sig = np.einsum('...st,...t->...s', D, d_eps)
+        sig += d_sig
+        d_gamma = f_trial / (self.E_b + self.K_bar + self.H_bar) * plas
+        alpha += d_gamma
+        q += d_gamma * self.H_bar * np.sign(xi_trial)
+
+        return sig, D, alpha, q
 
     n_s = Constant(3)
 
@@ -133,7 +173,7 @@ class TStepper(HasTraits):
     @cached_property
     def _get_domain(self):
         # Number of elements
-        n_e_x = 2
+        n_e_x = 10
         # length
         L_x = 20.0
         # Element definition
@@ -201,7 +241,7 @@ class TStepper(HasTraits):
 
         # shape function for the unknowns
         # [ d, n, i]
-        Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None, :])
+        Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None,:])
         dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
 
         # [ i, n, d ]
@@ -215,9 +255,9 @@ class TStepper(HasTraits):
         B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
         B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
         B_factors = np.array([-1, 1], dtype='float_')
-        B[:, :, :, B_N_n_rows, B_N_n_cols] = (B_factors[None, None, :] *
+        B[:, :,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
                                               Nx[:, :, N_idx])
-        B[:, :, :, B_dN_n_rows, B_dN_n_cols] = dNx[:, :, :, dN_idx]
+        B[:, :,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
 
         return B
 
@@ -234,7 +274,7 @@ class TStepper(HasTraits):
         for bc in self.bc_list:
             bc.apply(step_flag, None, K_mtx, F_ext, t_n, t_n1)
 
-    def get_corr_pred(self, step_flag, U, d_U, t_n, t_n1):
+    def get_corr_pred(self, step_flag, U, d_U, eps, sig, t_n, t_n1, alpha, q):
         '''Function calculationg the residuum and tangent operator.
         '''
         mats_eval = self.mats_eval
@@ -248,19 +288,22 @@ class TStepper(HasTraits):
         # [ i ]
         w_ip = fets_eval.ip_weights
 
-        u_e = U[elem_dof_map]
+        d_u_e = d_U[elem_dof_map]
         #[n_e, n_dof_r, n_dim_dof]
-        u_n = u_e.reshape(n_e, n_dof_r, n_nodal_dofs)
+        d_u_n = d_u_e.reshape(n_e, n_dof_r, n_nodal_dofs)
         #[n_e, n_ip, n_s]
-        eps = np.einsum('einsd,end->eis', self.B, u_n)
+        d_eps = np.einsum('einsd,end->eis', self.B, d_u_n)
+
+        # update strain
+        eps += d_eps
 
         # material response state variables at integration point
-        sig, D = mats_eval.get_corr_pred(eps, t_n, t_n1)
-        print sig
+        sig, D, alpha, q = mats_eval.get_corr_pred(
+            eps, d_eps, sig, t_n, t_n1, alpha, q)
 
         # system matrix
         self.K.reset_mtx()
-        Ke = np.einsum('i,einsd,st,eimtf,ei->endmf',
+        Ke = np.einsum('i,einsd,eist,eimtf,ei->endmf',
                        w_ip, self.B, D, self.B, self.J_det)
 
         self.K.add_mtx_array(
@@ -272,16 +315,16 @@ class TStepper(HasTraits):
                            w_ip, sig, self.B, self.J_det)
         F_int = -np.bincount(elem_dof_map.flatten(), weights=Fe_int.flatten())
         self.apply_bc(step_flag, self.K, F_int, t_n, t_n1)
-        return F_int, self.K
+        return F_int, self.K, eps, sig, alpha, q
 
 
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    d_t = Float(0.1)
-    t_max = Float(1.0)
-    k_max = Int(10)
-    tolerance = Float(1e-4)
+    d_t = Float(0.02)
+    t_max = Float(3.0)
+    k_max = Int(20)
+    tolerance = Float(1e-8)
 
     def eval(self):
 
@@ -290,24 +333,37 @@ class TLoop(HasTraits):
         t_n = 0.
         t_n1 = t_n
         n_dofs = self.ts.domain.n_dofs
+        n_e = self.ts.domain.n_active_elems
+        n_ip = self.ts.fets_eval.n_gp
+        n_s = self.ts.mats_eval.n_s
         U_record = np.zeros(n_dofs)
         F_record = np.zeros(n_dofs)
         U_k = np.zeros(n_dofs)
-        d_U = np.zeros(n_dofs)
+        eps = np.zeros((n_e, n_ip, n_s))
+        sig = np.zeros((n_e, n_ip, n_s))
+        alpha = np.zeros((n_e, n_ip))
+        q = np.zeros((n_e, n_ip))
 
         while t_n1 <= self.t_max:
             k = 0
             step_flag = 'predictor'
-            print '================='
+            d_U = np.zeros(n_dofs)
+#             print '=============================='
+#             print 't=====', t_n
             while k < self.k_max:
-                R, K = ts.get_corr_pred(step_flag, U_k, d_U, t_n, t_n1)
+                R, K, eps, sig, alpha, q = ts.get_corr_pred(
+                    step_flag, U_k, d_U, eps, sig, t_n, t_n1, alpha, q)
+
                 F_ext = -R
+#                 print 'R1', R
                 K.apply_constraints(R)
+#                 print 'R2', R
                 if np.linalg.norm(R) < self.tolerance:
+                    #                     print 'f', F_ext[-1]
                     F_record = np.vstack((F_record, F_ext))
                     break
                 d_U = K.solve()
-                print k, d_U
+#                 print k, d_U
                 U_k += d_U
                 k += 1
                 step_flag = 'corrector'
@@ -329,14 +385,16 @@ if __name__ == '__main__':
 
     n_dofs = ts.domain.n_dofs
 
+    tf = lambda t: 1 - np.abs(t - 1)
     ts.bc_list = [BCDof(var='u', dof=0, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=1.0)]
+                  BCDof(var='u', dof=n_dofs - 1, value=2.5, time_function=tf)]
 
     tl = TLoop(ts=ts)
 
     U_record, F_record = tl.eval()
 #     print 'U_record', U_record
-    plt.plot(U_record[:, 5], F_record[:, 5], marker='o')
+    n_dof = 2 * ts.domain.n_active_elems + 1
+    plt.plot(U_record[:, n_dof], F_record[:, n_dof], marker='.')
     plt.xlabel('displacement')
     plt.ylabel('force')
     plt.show()

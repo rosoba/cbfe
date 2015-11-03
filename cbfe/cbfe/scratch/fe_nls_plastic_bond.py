@@ -43,29 +43,32 @@ class MATSEval(HasTraits):
                   enter_set=True,
                   auto_set=False)
 
-    def get_G(self, slip):
-        #         return 0.1
-        #         print 'slip', slip
-        return np.maximum(0.1 - 0.1 * slip, -0.005)
+#     def get_G(self, slip):
+# return 0.1
+# print 'slip', slip
+#         return np.maximum(0.1 - 0.1 * slip, -0.005)
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1, alpha, q):
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
-        D[:, :, 0, 0] = self.E_m
-        D[:, :, 2, 2] = self.E_f
-        sig_trial = sig[:, :, 1] + self.E_b * d_eps[:,:, 1]
+        D[:,:, 0, 0] = self.E_m
+        D[:,:, 2, 2] = self.E_f
+        sig_trial = sig[:,:, 1] + self.E_b * d_eps[:,:, 1]
         xi_trial = sig_trial - q
         f_trial = abs(xi_trial) - (self.sigma_y + self.K_bar * alpha)
         elas = f_trial <= 1e-8
         plas = f_trial > 1e-8
         E_p = ( self.E_b * ( self.K_bar + self.H_bar ) ) / \
             (self.E_b + self.K_bar + self.H_bar)
-        D[:, :, 1, 1] = self.E_b*elas + E_p*plas
+        D[:,:, 1, 1] = self.E_b*elas + E_p*plas
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
+
         d_gamma = f_trial / (self.E_b + self.K_bar + self.H_bar) * plas
         alpha += d_gamma
         q += d_gamma * self.H_bar * np.sign(xi_trial)
+
+        sig[:,:, 1] = sig_trial - d_gamma * self.E_b * np.sign(xi_trial)
 
         return sig, D, alpha, q
 
@@ -194,7 +197,7 @@ class TStepper(HasTraits):
         # [ d, n ]
         geo_r = fets_eval.geo_r.T
         # [ d, n, i ]
-        dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
+        dNr_geo = geo_r[:,:, None] * np.array([1, 1]) * 0.5
         # [ i, n, d ]
         dNr_geo = np.einsum('dni->ind', dNr_geo)
         # [ n_e, n_geo_r, n_dim_geo ]
@@ -233,7 +236,7 @@ class TStepper(HasTraits):
         # [ d, n ]
         geo_r = fets_eval.geo_r.T
         # [ d, n, i ]
-        dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
+        dNr_geo = geo_r[:,:, None] * np.array([1, 1]) * 0.5
         # [ i, n, d ]
         dNr_geo = np.einsum('dni->ind', dNr_geo)
 
@@ -241,8 +244,8 @@ class TStepper(HasTraits):
 
         # shape function for the unknowns
         # [ d, n, i]
-        Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None,:])
-        dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
+        Nr = 0.5 * (1. + geo_r[:,:, None] * r_ip[None,:])
+        dNr = 0.5 * geo_r[:,:, None] * np.array([1, 1])
 
         # [ i, n, d ]
         Nr = np.einsum('dni->ind', Nr)
@@ -255,9 +258,9 @@ class TStepper(HasTraits):
         B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
         B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
         B_factors = np.array([-1, 1], dtype='float_')
-        B[:, :,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
-                                              Nx[:, :, N_idx])
-        B[:, :,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
+        B[:,:,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
+                                              Nx[:,:, N_idx])
+        B[:,:,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
 
         return B
 
@@ -394,6 +397,7 @@ if __name__ == '__main__':
     U_record, F_record = tl.eval()
 #     print 'U_record', U_record
     n_dof = 2 * ts.domain.n_active_elems + 1
+#     print F_record[:, n_dof]
     plt.plot(U_record[:, n_dof], F_record[:, n_dof], marker='.')
     plt.xlabel('displacement')
     plt.ylabel('force')

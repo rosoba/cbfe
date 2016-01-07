@@ -48,7 +48,7 @@ class MATSEval(HasTraits):
 #     g = lambda self, k: 1. / (1 + np.exp(-0.7 * k + 6.))
     g = lambda self, k: 1. / \
         (1 + np.exp(-0.9 * k + 6.)) * 0.5 + \
-        0.3 * (k > 0.1) + 2 * k * (k <= 0.1)
+        0.3 * (k > 0.1) + 3 * k * (k <= 0.1)
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1, alpha, q, kappa):
         #         g = lambda k: 0.8 - 0.8 * np.exp(-k)
@@ -198,9 +198,9 @@ class TStepper(HasTraits):
     @cached_property
     def _get_domain(self):
         # Number of elements
-        n_e_x = 50
+        n_e_x = 60
         # length
-        L_x = 250.
+        L_x = 600.
         # Element definition
         domain = FEGrid(coord_max=(L_x,),
                         shape=(n_e_x,),

@@ -354,7 +354,7 @@ class TLoop(HasTraits):
 
     def eval(self):
 
-        ts.apply_essential_bc()
+        self.ts.apply_essential_bc()
 
         t_n = 0.
         t_n1 = t_n
@@ -393,7 +393,7 @@ class TLoop(HasTraits):
                 #                     q = q_r
                 #                     kappa = kappa_r
 
-                R, K, eps, sig, alpha, q, kappa = ts.get_corr_pred(
+                R, K, eps, sig, alpha, q, kappa = self.ts.get_corr_pred(
                     step_flag, U_k, d_U_k, eps, sig, t_n, t_n1, alpha, q, kappa)
 
                 F_ext = -R

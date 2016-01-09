@@ -48,48 +48,23 @@ class MATSEval(HasTraits):
 #     g = lambda self, k: 1. / (1 + np.exp(-0.7 * k + 6.))
     g = lambda self, k: 1. / \
         (1 + np.exp(-0.9 * k + 6.)) * 0.5 + \
-        0.3 * (k > 0.1) + 2 * k * (k <= 0.1)
+        0.3 * (k > 0.1) + 3 * k * (k <= 0.1)
 
-    # reiforcement damage law
-    def g_f(self, eps_f, eps_f_max):
-        e = abs(eps_f) * (abs(eps_f) > eps_f_max) + \
-            eps_f_max * (abs(eps_f) <= eps_f_max)
-        w_f = 50. * (e - 0.0015) * (e > 0.0015) * \
-            (e <= 0.0215) + 1. * (e > 0.0215)
-        return w_f, e
-#         return 0, e
-
-    # derivative of g_f
-    def d_g_f(self, eps_f, eps_f_max):
-        dx = 1e-6
-        return (self.g_f(eps_f + dx, eps_f_max)[0] - self.g_f(eps_f, eps_f_max)[0]) / dx
-
-    def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1, alpha, q, kappa, eps_f_max):
-
+    def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1, alpha, q, kappa):
+        #         g = lambda k: 0.8 - 0.8 * np.exp(-k)
+        #         g = lambda k: 1. / (1 + np.exp(-2 * k + 6.))
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
-
-        # matrix
-        sig[:,:, 0] = self.E_m*eps[:,:, 0]
         D[:,:, 0, 0] = self.E_m
-
-        # reinforcement
-        eps_f = eps[:,:, 2]
-        sig_f_e = self.E_f * eps_f
-        w_f, eps_f_max = self.g_f(eps_f, eps_f_max)
-        print 'w_f', np.amax(w_f)
-        print 'eps_f', np.amax(eps_f)
-        sig[:,:, 2] = (1-w_f)*sig_f_e
-        D[:,:, 2, 2] = -self.d_g_f(eps_f, eps_f_max) * sig_f_e + (1 - w_f) * self.E_f
-#         sig[:,:, 2] = sig_f_e
-#         D[:,:, 2, 2] = self.E_f
-
-        # bond interface
+        D[:,:, 2, 2] = self.E_f
         sig_trial = sig[:,:, 1]/(1-self.g(kappa)) + self.E_b * d_eps[:,:, 1]
         xi_trial = sig_trial - q
         f_trial = abs(xi_trial) - (self.sigma_y + self.K_bar * alpha)
         elas = f_trial <= 1e-8
         plas = f_trial > 1e-8
+        d_sig = np.einsum('...st,...t->...s', D, d_eps)
+        sig += d_sig
+
         d_gamma = f_trial / (self.E_b + self.K_bar + self.H_bar) * plas
         alpha += d_gamma
         kappa += d_gamma
@@ -99,16 +74,13 @@ class MATSEval(HasTraits):
         sig_e = sig_trial - d_gamma * self.E_b * np.sign(xi_trial)
         sig[:,:, 1] = (1-w)*sig_e
 
-#         sig1[:, :, 1] = (1-w)*sig_e
-#         print sig - sig1
-
         E_p = -self.E_b / (self.E_b + self.K_bar + self.H_bar) * derivative(self.g, kappa, dx=1e-6) * sig_e \
             + (1 - w) * self.E_b * (self.K_bar + self.H_bar) / \
             (self.E_b + self.K_bar + self.H_bar)
 
         D[:,:, 1, 1] = (1-w)*self.E_b*elas + E_p*plas
 
-        return sig, D, alpha, q, kappa, eps_f_max
+        return sig, D, alpha, q, kappa
 
     n_s = Constant(3)
 
@@ -228,7 +200,7 @@ class TStepper(HasTraits):
         # Number of elements
         n_e_x = 60
         # length
-        L_x = 300.
+        L_x = 600.
         # Element definition
         domain = FEGrid(coord_max=(L_x,),
                         shape=(n_e_x,),
@@ -327,7 +299,7 @@ class TStepper(HasTraits):
         for bc in self.bc_list:
             bc.apply(step_flag, None, K_mtx, F_ext, t_n, t_n1)
 
-    def get_corr_pred(self, step_flag, U, d_U, eps, sig, t_n, t_n1, alpha, q, kappa, eps_f_max):
+    def get_corr_pred(self, step_flag, U, d_U, eps, sig, t_n, t_n1, alpha, q, kappa):
         '''Function calculationg the residuum and tangent operator.
         '''
         mats_eval = self.mats_eval
@@ -352,8 +324,8 @@ class TStepper(HasTraits):
         eps += d_eps
 
         # material response state variables at integration point
-        sig, D, alpha, q, kappa, eps_f_max = mats_eval.get_corr_pred(
-            eps, d_eps, sig, t_n, t_n1, alpha, q, kappa, eps_f_max)
+        sig, D, alpha, q, kappa = mats_eval.get_corr_pred(
+            eps, d_eps, sig, t_n, t_n1, alpha, q, kappa)
 
         # system matrix
         self.K.reset_mtx()
@@ -369,7 +341,7 @@ class TStepper(HasTraits):
                            w_ip, self.A, sig, self.B, self.J_det)
         F_int = -np.bincount(elem_dof_map.flatten(), weights=Fe_int.flatten())
         self.apply_bc(step_flag, self.K, F_int, t_n, t_n1)
-        return F_int, self.K, eps, sig, alpha, q, kappa, eps_f_max
+        return F_int, self.K, eps, sig, alpha, q, kappa
 
 
 class TLoop(HasTraits):
@@ -398,7 +370,6 @@ class TLoop(HasTraits):
         alpha = np.zeros((n_e, n_ip))
         q = np.zeros((n_e, n_ip))
         kappa = np.zeros((n_e, n_ip))
-        eps_f_max = np.zeros((n_e, n_ip))
 
         while t_n1 <= self.t_max:
             t_n1 = t_n + self.d_t
@@ -422,8 +393,8 @@ class TLoop(HasTraits):
                 #                     q = q_r
                 #                     kappa = kappa_r
 
-                R, K, eps, sig, alpha, q, kappa, eps_f_max = self.ts.get_corr_pred(
-                    step_flag, U_k, d_U_k, eps, sig, t_n, t_n1, alpha, q, kappa, eps_f_max)
+                R, K, eps, sig, alpha, q, kappa = self.ts.get_corr_pred(
+                    step_flag, U_k, d_U_k, eps, sig, t_n, t_n1, alpha, q, kappa)
 
                 F_ext = -R
                 K.apply_constraints(R)

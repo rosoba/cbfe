@@ -359,17 +359,18 @@ class TLoop(HasTraits):
         n_e = self.ts.domain.n_active_elems
         n_ip = self.ts.fets_eval.n_gp
         n_s = self.ts.mats_eval.n_s
+        U_k = np.zeros(n_dofs)
+        eps = np.zeros((n_e, n_ip, n_s))
+        sig = np.zeros((n_e, n_ip, n_s))
+        alpha = np.zeros((n_e, n_ip))
+        q = np.zeros((n_e, n_ip))
+
         U_record = np.zeros(n_dofs)
         F_record = np.zeros(n_dofs)
         sf_record = np.zeros(2 * n_e)
         t_record = [t_n]
-        U_k = np.zeros(n_dofs)
-        eps = np.zeros((n_e, n_ip, n_s))
-        sig = np.zeros((n_e, n_ip, n_s))
         eps_record = [np.zeros_like(eps)]
         sig_record = [np.zeros_like(sig)]
-        alpha = np.zeros((n_e, n_ip))
-        q = np.zeros((n_e, n_ip))
 
         while t_n1 <= self.t_max:
             t_n1 = t_n + self.d_t
@@ -398,7 +399,6 @@ class TLoop(HasTraits):
                     sig_record.append(np.copy(sig))
                     t_record.append(t_n1)
                     break
-
                 k += 1
                 step_flag = 'corrector'
 

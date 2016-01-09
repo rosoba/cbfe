@@ -4,7 +4,7 @@ Created on 07.01.2016
 @author: Yingxiong
 '''
 import numpy as np
-from fe_nls_plastic_bond import MATSEval, FETS1D52ULRH, TStepper, TLoop
+from fe_nls_plastic_damage import MATSEval, FETS1D52ULRH, TStepper, TLoop
 from matplotlib import pyplot as plt
 from ibvpy.api import BCDof
 from traits.api import HasTraits, Property, Instance, cached_property, Str, Button, Range, on_trait_change, Array, List
@@ -43,19 +43,23 @@ class Mainwindow(HasTraits):
         self.draw()
         self.figure.canvas.draw()
 
-    sigma_y = Range(0.2, 1.2)
-    E_b = Range(0.05, 0.35)
-    K_bar = Range(-0.01, 0.05)
+    sigma_y = Range(0.5, 1.5, value=1.05)
+    E_b = Range(1.0, 3.0, value=2.0)
+    K_bar = Range(-0.01, 0.15, value=0.08)
+    alpha = Range(0.50, 2.50, value=1.0)
+    beta = Range(0.00, 1.00, value=1.0)
 
-    @on_trait_change('sigma_y, E_b, K_bar')
+    @on_trait_change('sigma_y, E_b, K_bar, alpha, beta')
     def plot(self):
         self.mats_eval.sigma_y = self.sigma_y
         self.mats_eval.E_b = self.E_b
         self.mats_eval.K_bar = self.K_bar
+        self.mats_eval.alpha = self.alpha
+        self.mats_eval.beta = self.beta
         self.draw()
         self.figure.canvas.draw()
 
-    L_x = Range(5., 15., value=15.)
+    L_x = Range(200., 600., value=600.)
 
     @on_trait_change('L_x')
     def plot1(self):
@@ -103,9 +107,11 @@ class Mainwindow(HasTraits):
         self.U_record, self.F_record, self.sf_record, self.t_record, self.eps_record, self.sig_record = self.time_loop.eval()
         n_dof = 2 * self.time_stepper.domain.n_active_elems + 1
 
-        slip, bond = self.time_stepper.mats_eval.get_bond_slip()
+        slip, sig_n_arr, sig_e_arr, w_arr = self.time_stepper.mats_eval.get_bond_slip()
         self.ax1.cla()
-        l_bs, = self.ax1.plot(slip, bond)
+        l_bs, = self.ax1.plot(slip, sig_n_arr)
+        self.ax1.plot(slip, sig_e_arr, '--')
+        self.ax1.plot(slip, w_arr, '--')
         self.ax1.set_title('bond-slip law')
 
         self.ax2.cla()
@@ -179,15 +185,18 @@ class Mainwindow(HasTraits):
 
     view = View(HSplit(Item('figure', editor=MPLFigureEditor(),
                             dock='vertical', width=0.7, height=0.9),
-                       Group(Item('mats_eval'),
-                             Item('fets_eval'),
-                             Item('time_stepper'),
-                             Item('time_loop'),
-                             Item('sigma_y'),
-                             Item('E_b'),
-                             Item('K_bar'),
+                       Group(Group(Item('sigma_y'),
+                                   Item('E_b'),
+                                   Item('K_bar'),
+                                   Item('alpha'),
+                                   Item('beta'),
+                                   label='bond-slip law', show_labels=True, show_border=True),
                              Item('L_x'),
-                             Item('time')),
+                             Item('time'),
+                             Group(Item('mats_eval'),
+                                   Item('fets_eval'),
+                                   Item('time_stepper'),
+                                   Item('time_loop'), show_border=True)),
                        show_labels=False),
                 resizable=True,
                 height=0.9, width=1.0,
@@ -198,7 +207,7 @@ if __name__ == '__main__':
     ts = TStepper()
     n_dofs = ts.domain.n_dofs
     ts.bc_list = [BCDof(var='u', dof=0, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=5.0)]
+                  BCDof(var='u', dof=n_dofs - 1, value=10.0)]
     tl = TLoop(ts=ts)
 
     window = Mainwindow(mats_eval=ts.mats_eval,

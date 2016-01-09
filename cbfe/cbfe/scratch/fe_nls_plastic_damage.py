@@ -44,20 +44,18 @@ class MATSEval(HasTraits):
                   enter_set=True,
                   auto_set=False)
     # bond damage law
-#     g = lambda self, k: 0.8 - 0.8 * np.exp(-k)
-#     g = lambda self, k: 1. / (1 + np.exp(-0.7 * k + 6.))
-    g = lambda self, k: 1. / \
-        (1 + np.exp(-0.9 * k + 6.)) * 0.5 + \
-        0.3 * (k > 0.1) + 3 * k * (k <= 0.1)
+    alpha = Float(1.0)
+    beta = Float(1.0)
+    g = lambda self, k: 1. / (1 + np.exp(-self.alpha * k + 6.)) * self.beta
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1, alpha, q, kappa):
         #         g = lambda k: 0.8 - 0.8 * np.exp(-k)
         #         g = lambda k: 1. / (1 + np.exp(-2 * k + 6.))
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
-        D[:,:, 0, 0] = self.E_m
-        D[:,:, 2, 2] = self.E_f
-        sig_trial = sig[:,:, 1]/(1-self.g(kappa)) + self.E_b * d_eps[:,:, 1]
+        D[:, :, 0, 0] = self.E_m
+        D[:, :, 2, 2] = self.E_f
+        sig_trial = sig[:, :, 1]/(1-self.g(kappa)) + self.E_b * d_eps[:,:, 1]
         xi_trial = sig_trial - q
         f_trial = abs(xi_trial) - (self.sigma_y + self.K_bar * alpha)
         elas = f_trial <= 1e-8
@@ -72,15 +70,46 @@ class MATSEval(HasTraits):
         w = self.g(kappa)
 
         sig_e = sig_trial - d_gamma * self.E_b * np.sign(xi_trial)
-        sig[:,:, 1] = (1-w)*sig_e
+        sig[:, :, 1] = (1-w)*sig_e
 
         E_p = -self.E_b / (self.E_b + self.K_bar + self.H_bar) * derivative(self.g, kappa, dx=1e-6) * sig_e \
             + (1 - w) * self.E_b * (self.K_bar + self.H_bar) / \
             (self.E_b + self.K_bar + self.H_bar)
 
-        D[:,:, 1, 1] = (1-w)*self.E_b*elas + E_p*plas
+        D[:, :, 1, 1] = (1-w)*self.E_b*elas + E_p*plas
 
         return sig, D, alpha, q, kappa
+
+    def get_bond_slip(self):
+        '''for plotting the bond slip relationship
+        '''
+        s_arr = np.hstack((np.linspace(0, 10, 200),
+                           np.linspace(10., 10. - self.sigma_y / self.E_b, 10)))
+        sig_e_arr = np.zeros_like(s_arr)
+        sig_n_arr = np.zeros_like(s_arr)
+        w_arr = np.zeros_like(s_arr)
+
+        sig_e = 0.
+        alpha = 0.
+        kappa = 0.
+
+        for i in range(1, len(s_arr)):
+            d_eps = s_arr[i] - s_arr[i - 1]
+            sig_e_trial = sig_e + self.E_b * d_eps
+            f_trial = abs(sig_e_trial) - (self.sigma_y + self.K_bar * alpha)
+            if f_trial <= 1e-8:
+                sig_e = sig_e_trial
+            else:
+                d_gamma = f_trial / (self.E_b + self.K_bar)
+                alpha += d_gamma
+                kappa += d_gamma
+                sig_e = sig_e_trial - d_gamma * self.E_b * np.sign(sig_e_trial)
+            w = self.g(kappa)
+            w_arr[i] = w
+            sig_n_arr[i] = (1. - w) * sig_e
+            sig_e_arr[i] = sig_e
+
+        return s_arr, sig_n_arr, sig_e_arr, w_arr
 
     n_s = Constant(3)
 
@@ -192,24 +221,25 @@ class TStepper(HasTraits):
     def _get_A(self):
         return np.array([self.fets_eval.A_m, self.fets_eval.L_b, self.fets_eval.A_f])
 
-    domain = Property(Instance(FEGrid))
+    # Number of elements
+    n_e_x = 30
+    # length
+    L_x = Float(600.0)
+
+    domain = Property(Instance(FEGrid), depends_on='L_x')
     '''Diescretization object.
     '''
     @cached_property
     def _get_domain(self):
-        # Number of elements
-        n_e_x = 60
-        # length
-        L_x = 600.
         # Element definition
-        domain = FEGrid(coord_max=(L_x,),
-                        shape=(n_e_x,),
+        domain = FEGrid(coord_max=(self.L_x,),
+                        shape=(self.n_e_x,),
                         fets_eval=self.fets_eval)
         return domain
 
     bc_list = List(Instance(BCDof))
 
-    J_mtx = Property
+    J_mtx = Property(depends_on='L_x')
     '''Array of Jacobian matrices.
     '''
     @cached_property
@@ -219,7 +249,7 @@ class TStepper(HasTraits):
         # [ d, n ]
         geo_r = fets_eval.geo_r.T
         # [ d, n, i ]
-        dNr_geo = geo_r[:,:, None] * np.array([1, 1]) * 0.5
+        dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
         # [ i, n, d ]
         dNr_geo = np.einsum('dni->ind', dNr_geo)
         # [ n_e, n_geo_r, n_dim_geo ]
@@ -228,14 +258,14 @@ class TStepper(HasTraits):
         J_mtx = np.einsum('ind,enf->eidf', dNr_geo, elem_x_map)
         return J_mtx
 
-    J_det = Property
+    J_det = Property(depends_on='L_x')
     '''Array of Jacobi determinants.
     '''
     @cached_property
     def _get_J_det(self):
         return np.linalg.det(self.J_mtx)
 
-    B = Property
+    B = Property(depends_on='L_x')
     '''The B matrix
     '''
     @cached_property
@@ -258,7 +288,7 @@ class TStepper(HasTraits):
         # [ d, n ]
         geo_r = fets_eval.geo_r.T
         # [ d, n, i ]
-        dNr_geo = geo_r[:,:, None] * np.array([1, 1]) * 0.5
+        dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
         # [ i, n, d ]
         dNr_geo = np.einsum('dni->ind', dNr_geo)
 
@@ -266,8 +296,8 @@ class TStepper(HasTraits):
 
         # shape function for the unknowns
         # [ d, n, i]
-        Nr = 0.5 * (1. + geo_r[:,:, None] * r_ip[None,:])
-        dNr = 0.5 * geo_r[:,:, None] * np.array([1, 1])
+        Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None,:])
+        dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
 
         # [ i, n, d ]
         Nr = np.einsum('dni->ind', Nr)
@@ -280,9 +310,9 @@ class TStepper(HasTraits):
         B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
         B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
         B_factors = np.array([-1, 1], dtype='float_')
-        B[:,:,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
-                                              Nx[:,:, N_idx])
-        B[:,:,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
+        B[:, :,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
+                                              Nx[:, :, N_idx])
+        B[:, :,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
 
         return B
 
@@ -347,8 +377,8 @@ class TStepper(HasTraits):
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    d_t = Float(0.005)
-    t_max = Float(2.0)
+    d_t = Float(0.01)
+    t_max = Float(1.0)
     k_max = Int(50)
     tolerance = Float(1e-5)
 
@@ -362,14 +392,19 @@ class TLoop(HasTraits):
         n_e = self.ts.domain.n_active_elems
         n_ip = self.ts.fets_eval.n_gp
         n_s = self.ts.mats_eval.n_s
-        U_record = np.zeros(n_dofs)
-        F_record = np.zeros(n_dofs)
         U_k = np.zeros(n_dofs)
         eps = np.zeros((n_e, n_ip, n_s))
         sig = np.zeros((n_e, n_ip, n_s))
         alpha = np.zeros((n_e, n_ip))
         q = np.zeros((n_e, n_ip))
         kappa = np.zeros((n_e, n_ip))
+
+        U_record = np.zeros(n_dofs)
+        F_record = np.zeros(n_dofs)
+        sf_record = np.zeros(2 * n_e)
+        t_record = [t_n]
+        eps_record = [np.zeros_like(eps)]
+        sig_record = [np.zeros_like(sig)]
 
         while t_n1 <= self.t_max:
             t_n1 = t_n + self.d_t
@@ -406,17 +441,16 @@ class TLoop(HasTraits):
                     F_record = np.vstack((F_record, F_ext))
                     U_k += d_U
                     U_record = np.vstack((U_record, U_k))
-#                     eps_r = eps
-#                     sig_r = sig
-#                     alpha_r = alpha
-#                     q_r = q
-#                     kappa_r = kappa
+                    sf_record = np.vstack((sf_record, sig[:, :, 1].flatten()))
+                    eps_record.append(np.copy(eps))
+                    sig_record.append(np.copy(sig))
+                    t_record.append(t_n1)
                     break
                 k += 1
                 step_flag = 'corrector'
 
             t_n = t_n1
-        return U_record, F_record
+        return U_record, F_record, sf_record, np.array(t_record), eps_record, sig_record
 
 if __name__ == '__main__':
 
@@ -434,11 +468,11 @@ if __name__ == '__main__':
 # BCDof(var='u', dof=n_dofs - 1, value=2.5, time_function=tf)]
 
     ts.bc_list = [BCDof(var='u', dof=0, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=5.0)]
+                  BCDof(var='u', dof=n_dofs - 1, value=10.0)]
 
     tl = TLoop(ts=ts)
 
-    U_record, F_record = tl.eval()
+    U_record, F_record, sf_record, t_record, eps_record, sig_record = tl.eval()
 #     print 'U_record', U_record
     n_dof = 2 * ts.domain.n_active_elems + 1
 #     print U_record[:, n_dof]
@@ -448,58 +482,3 @@ if __name__ == '__main__':
     plt.xlabel('displacement')
     plt.ylabel('force')
     plt.show()
-
-#     n_dofs = ts.domain.n_dofs
-#
-#     KMAX = 10
-#     tolerance = 10e-4
-#     U_k = np.zeros(n_dofs)
-#
-# time step parameters
-#     t = 0.
-#     tstep = 0.1
-#     tmax = 1.0
-#
-# external force
-#     F_ext = np.zeros(n_dofs)
-#
-# maximum force
-#     n_e_x = ts.domain.shape[0]
-#     F_max = np.zeros(n_dofs)
-#     F_max[2 * n_e_x + 1] = 1.0
-#
-# for visualization
-#     U_record = np.zeros(n_dofs)
-#     F_record = np.zeros(n_dofs)
-#
-#     while t <= tmax:
-#
-#         t += tstep
-#         F_ext += tstep * F_max
-#
-#         k = 0
-#         step_flag = 'predictor'
-#
-#         while k < KMAX:
-#
-#             R, K = ts.get_corr_pred(U_k, t, F_ext, 0)
-#
-#             if np.linalg.norm(R) < tolerance:
-#                 break
-#
-#             K.apply_constraints(R)
-#             d_U = K.solve()
-#
-#             U_k += d_U
-#             k += 1
-#             step_flag = 'corrector'
-#
-#         U_record = np.vstack((U_record, U_k))
-#         F_record = np.vstack((F_record, F_ext))
-#
-# print U_record[:, 5]
-# print F_record[:, 5]
-#     plt.plot(U_record[:, 5], F_record[:, 5], marker='o')
-#     plt.xlabel('displacement')
-#     plt.ylabel('force')
-#     plt.show()

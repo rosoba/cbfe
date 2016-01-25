@@ -25,7 +25,7 @@ class MATSEval(HasTraits):
     E_m = Float(28484, tooltip='Stiffness of the matrix',
                 auto_set=False, enter_set=False)
 
-    E_f = Float(1700000, tooltip='Stiffness of the fiber',
+    E_f = Float(170000, tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
     slip = List([-1e-5])
@@ -492,7 +492,7 @@ if __name__ == '__main__':
 
     w_arr = np.linspace(0, 10.0001, 501)
 
-    pf_arr = interp(w_arr) * 100.
+    pf_arr = interp(w_arr) * 1000.
 
     tl = TLoop(ts=ts, w_arr=w_arr, pf_arr=pf_arr)
 

@@ -20,9 +20,10 @@ from scipy.interpolate import interp1d
 
 
 class Material(HasTraits):
-    sigma_y = Range(0.5, 1.5, value=1.05)
-    E_b = Range(1.0, 3.0, value=2.0)
+    sigma_y = Range(0.5, 5.5, value=1.05)
+    E_b = Range(1.0, 8.0, value=2.0)
     K_bar = Range(-0.01, 0.15, value=0.08)
+    H_bar = Range(-0.1, 0.1, value=0.00)
     alpha = Range(0.50, 2.50, value=1.0)
     beta = Range(0.00, 1.00, value=1.0)
 
@@ -127,6 +128,7 @@ class MainWindow(HasTraits):
         self.mats_eval.K_bar = self.tree.material[0].K_bar
         self.mats_eval.alpha = self.tree.material[0].alpha
         self.mats_eval.beta = self.tree.material[0].beta
+        self.mats_eval.H_bar = self.tree.material[0].H_bar
 
         # assign the geometry parameters
         self.fets_eval.A_m = self.tree.geometry[0].A_m

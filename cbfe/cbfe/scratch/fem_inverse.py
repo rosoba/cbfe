@@ -1,9 +1,12 @@
+'''
+Created on 19.01.2016
+
+@author: Yingxiong
+'''
 from envisage.ui.workbench.api import WorkbenchApplication
 from mayavi.sources.api import VTKDataSource, VTKFileReader
-
 from traits.api import implements, Int, Array, HasTraits, Instance, \
     Property, cached_property, Constant, Float, List
-
 from ibvpy.api import BCDof
 from ibvpy.fets.fets_eval import FETSEval, IFETSEval
 from ibvpy.mats.mats1D import MATS1DElastic
@@ -13,40 +16,72 @@ from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+from scipy.interpolate import interp1d
+from scipy.optimize import newton, brentq, bisect, minimize_scalar
 
 
 class MATSEval(HasTraits):
 
-    E_m = Float(10, tooltip='Stiffness of the matrix',
+    E_m = Float(28484, tooltip='Stiffness of the matrix',
                 auto_set=False, enter_set=False)
 
-    E_f = Float(10, tooltip='Stiffness of the fiber',
+    E_f = Float(1700000, tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
-#     G = Float(0.1, tooltip='Bond stiffness')
+    slip = List([-1e-5])
 
-    def get_G(self, slip):
-        #         return 0.1
-        #         print 'slip', slip
-        return np.maximum(0.1 - 0.1 * slip, -0.005)
+    bond = List([0.])
 
-    def get_bond(self, slip):
-        x = slip
+#     b_s_law = Property
+#
+#     def _get_b_s_law(self):
+#         return interp1d(self.slip, self.bond)
+# return np.interp(self.slip, self.bond)
+    def b_s_law(self, x):
+        return np.interp(x, self.slip, self.bond)
+
+    def G(self, x):
+        d = np.diff(self.bond) / np.diff(self.slip)
+        d = np.append(d, d[-1])
+        G = interp1d(np.array(self.slip), d, kind='zero')
         y = np.zeros_like(x)
-        y[x < 1.05] = 0.1 * x[x < 1.05] - 0.05 * x[x < 1.05] ** 2
-        y[x > 1.05] = 0.1 * 1.05 - 0.05 * \
-            1.05 ** 2 - 0.005 * (x[x > 1.05] - 1.05)
+        y[x < self.slip[0]] = d[0]
+        y[x > self.slip[-1]] = d[-1]
+        x[x < self.slip[0]] = self.slip[-1] + 10000.
+        y[x <= self.slip[-1]] = G(x[x <= self.slip[-1]])
         return y
+#     G = Property
+#
+#     def _get_G(self):
+#         d = np.diff(self.bond) / np.diff(self.slip)
+#         d = np.append(d, np.nan)
+#         return interp1d(self.slip, d, kind='zero')
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1):
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
         D[:, :, 0, 0] = self.E_m
         D[:, :, 2, 2] = self.E_f
-        D[:, :, 1, 1] = self.get_G(eps[:,:, 1])
+
+        d = np.diff(self.bond) / np.diff(self.slip)
+        d = np.append(d, np.nan)
+
+        G = interp1d(np.array(self.slip) * (1. + 1e-8), d, kind='zero')
+#         print d
+#         print G(np.array([[0.035, 0.0035], [0.0035, 0.0035]]))
+#         print self.slip
+#         a = eps[:,:, 1]
+#         print np.amax(a)
+        try:
+            D[:, :, 1, 1] = G(eps[:,:, 1])
+        except:
+            print np.array(self.slip) * (1. + 1e-4)
+            print eps[:, :, 1]
+            sys.exit()
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
-        sig[:, :, 1] = self.get_bond(eps[:,:, 1])
+
+        sig[:, :, 1] = self.b_s_law(eps[:,:, 1])
         return sig, D
 
     n_s = Constant(3)
@@ -61,6 +96,10 @@ class FETS1D52ULRH(FETSEval):
     implements(IFETSEval)
 
     debug_on = True
+
+    A_m = Float(100 * 8 - 9 * 1.85, desc='matrix area [mm2]')
+    A_f = Float(9 * 1.85, desc='reinforcement area [mm2]')
+    L_b = Float(1., desc='perimeter of the bond interface [mm]')
 
     # Dimensional mapping
     dim_slice = slice(0, 1)
@@ -95,7 +134,6 @@ class FETS1D52ULRH(FETSEval):
         return np.array([1., 1.], dtype=float)
 
     # Integration parameters
-    #
     ngp_r = 2
 
     def get_N_geo_mtx(self, r_pnt):
@@ -147,15 +185,22 @@ class TStepper(HasTraits):
     def _get_fets_eval(self):
         return FETS1D52ULRH()
 
+    A = Property()
+    '''array containing the A_m, L_b, A_f
+    '''
+    @cached_property
+    def _get_A(self):
+        return np.array([self.fets_eval.A_m, self.fets_eval.L_b, self.fets_eval.A_f])
+
     domain = Property(Instance(FEGrid))
     '''Diescretization object.
     '''
     @cached_property
     def _get_domain(self):
         # Number of elements
-        n_e_x = 4
+        n_e_x = 15
         # length
-        L_x = 20.0
+        L_x = 150.0
         # Element definition
         domain = FEGrid(coord_max=(L_x,),
                         shape=(n_e_x,),
@@ -284,16 +329,16 @@ class TStepper(HasTraits):
 
         # system matrix
         self.K.reset_mtx()
-        Ke = np.einsum('i,einsd,eist,eimtf,ei->endmf',
-                       w_ip, self.B, D, self.B, self.J_det)
+        Ke = np.einsum('i,s,einsd,eist,eimtf,ei->endmf',
+                       w_ip, self.A, self.B, D, self.B, self.J_det)
 
         self.K.add_mtx_array(
             Ke.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
 
         # internal forces
         # [n_e, n_n, n_dim_dof]
-        Fe_int = np.einsum('i,eis,einsd,ei->end',
-                           w_ip, sig, self.B, self.J_det)
+        Fe_int = np.einsum('i,s,eis,einsd,ei->end',
+                           w_ip, self.A, sig, self.B, self.J_det)
         F_int = -np.bincount(elem_dof_map.flatten(), weights=Fe_int.flatten())
         self.apply_bc(step_flag, self.K, F_int, t_n, t_n1)
         return F_int, self.K, eps, sig
@@ -302,10 +347,13 @@ class TStepper(HasTraits):
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    d_t = Float(0.01)
+    d_t = Float(0.002)
     t_max = Float(1.0)
-    k_max = Int(20)
+    k_max = Int(200)
     tolerance = Float(1e-8)
+#     w_arr, pf_arr = np.loadtxt('D:\\1.txt')
+    w_arr = Array
+    pf_arr = Array
 
     def eval(self):
 
@@ -317,36 +365,105 @@ class TLoop(HasTraits):
         n_e = self.ts.domain.n_active_elems
         n_ip = self.ts.fets_eval.n_gp
         n_s = self.ts.mats_eval.n_s
-        U_record = np.zeros(n_dofs)
-        F_record = np.zeros(n_dofs)
-        U_k = np.zeros(n_dofs)
+
         eps = np.zeros((n_e, n_ip, n_s))
         sig = np.zeros((n_e, n_ip, n_s))
+        i = 0.
 
         while t_n1 <= self.t_max:
+            i += 1.
+            print i
+
+            self.ts.mats_eval.slip.append(self.w_arr[i])
+            self.ts.mats_eval.bond.append(0.)
             t_n1 = t_n + self.d_t
-            k = 0
+
+            def pf(self, tau_i, eps, sig):
+                eps_temp = np.copy(eps)
+                sig_temp = np.copy(sig)
+                step_flag = 'predictor'
+
+                d_U_k = np.zeros(n_dofs)
+                self.ts.mats_eval.bond[-1] = tau_i
+                k = 0
+                while k < self.k_max:
+                    R, K, eps_temp, sig_temp = ts.get_corr_pred(
+                        step_flag, d_U_k, eps_temp, sig_temp, t_n, t_n1)
+                    F_ext = -R
+                    K.apply_constraints(R)
+                    d_U_k = K.solve()
+#                     d_U += d_U_k
+                    if np.linalg.norm(R) < self.tolerance:
+                        return F_ext[-1]
+                    k += 1
+                    step_flag = 'corrector'
+
+#             print pf(self, 0.00340719346727, eps, sig)
+#             print pf(self, 0.00340719346727 * 2., eps, sig)
+#             print pf(self, 0.001, eps, sig)
+#             print pf(self, 5., eps, sig)
+#
+#             tau = lambda tau_i: np.abs(
+# pf(self, tau_i, eps, sig) - self.pf_arr[i]) * 1. + np.abs(tau_i -
+# self.ts.mats_eval.bond[-2]) * 0.
+
+            tau = lambda tau_i: pf(self, tau_i, eps, sig) - self.pf_arr[i]
+            try:
+                #                 res = minimize_scalar(tau)
+                #                 tau_i = newton(
+                # tau, self.ts.mats_eval.bond[-2], maxiter=500, tol=1.48e-16)
+                tau_i = brentq(tau, 0, 1000, xtol=1e-16)
+            except:
+                print tau(0.)
+                print tau(10000.)
+                plt.plot(self.ts.mats_eval.slip, self.ts.mats_eval.bond)
+                plt.show()
+                sys.exit()
+            print tau_i
+#             print tau(tau_i)
+#             print tau(0.8 * tau_i)
+#             print tau(0.9 * tau_i)
+#             print tau(0.95 * tau_i)
+#             print tau(tau_i * 1.2)
+#             print tau(tau_i * 1.5)
+#             print tau(tau_i * 2.)
+
+            self.ts.mats_eval.bond[-1] = tau_i
+
+#             print '1111111111111111111111'
+
             step_flag = 'predictor'
-            d_U = np.zeros(n_dofs)
             d_U_k = np.zeros(n_dofs)
+#             self.ts.mats_eval.bond[-1] = tau_i
+            k = 0
             while k < self.k_max:
                 R, K, eps, sig = ts.get_corr_pred(
                     step_flag, d_U_k, eps, sig, t_n, t_n1)
-
                 F_ext = -R
                 K.apply_constraints(R)
                 d_U_k = K.solve()
-                d_U += d_U_k
+#                     d_U += d_U_k
                 if np.linalg.norm(R) < self.tolerance:
-                    F_record = np.vstack((F_record, F_ext))
-                    U_k += d_U
-                    U_record = np.vstack((U_record, U_k))
+                    print F_ext[-1]
+                    print self.pf_arr[i]
+                    print '===='
                     break
                 k += 1
                 step_flag = 'corrector'
 
+            # regularization
+            if i % 2.0 == 0.:
+                # print i
+                # print self.ts.mats_eval.slip[-3:]
+                b_avg = np.mean(self.ts.mats_eval.bond[-2:])
+                s_avg = np.mean(self.ts.mats_eval.slip[-2:])
+                del self.ts.mats_eval.bond[-2:]
+                del self.ts.mats_eval.slip[-2:]
+                self.ts.mats_eval.bond.append(b_avg)
+                self.ts.mats_eval.slip.append(s_avg)
+
             t_n = t_n1
-        return U_record, F_record
+        return self.ts.mats_eval.slip, self.ts.mats_eval.bond
 
 if __name__ == '__main__':
 
@@ -362,17 +479,32 @@ if __name__ == '__main__':
 #     tf = lambda t: 1 - np.abs(t - 1)
 
     ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=3.5)]
+                  BCDof(var='u', dof=n_dofs - 1, value=10.0)]
 
-    tl = TLoop(ts=ts)
+#     w_arr, pf_arr = np.loadtxt('D:\\1.txt')
+    fpath = 'D:\\data\\pull_out\\all\\DPO-30cm-0-3300SBR-V3_R3_f.asc'
 
-    U_record, F_record = tl.eval()
-    n_dof = 2 * ts.domain.n_active_elems + 1
-    np.savetxt('D:\\1.txt', np.vstack((
-        U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
-#     x, y = np.loadtxt('D:\\1.txt')
+    x, y = np.loadtxt(fpath,  delimiter=';')
+
+    x[0] = 0.
+
+    interp = interp1d(x / 2., y)
+
+    w_arr = np.linspace(0, 10.0001, 501)
+
+    pf_arr = interp(w_arr) * 100.
+
+    tl = TLoop(ts=ts, w_arr=w_arr, pf_arr=pf_arr)
+
+    slip, bond = tl.eval()
+
+    plt.plot(slip, bond)
+#     x = np.linspace(0., 3.5, 1000)
+#     y = np.zeros_like(x)
+#     y[x < 1.05] = 0.1 * x[x < 1.05] - 0.05 * x[x < 1.05] ** 2
+
+#     y[x > 1.05] = 0.1 * 1.05 - 0.05 * \
+#         1.05 ** 2 - 0.005 * (x[x > 1.05] - 1.05)
 #     plt.plot(x, y)
-    plt.plot(U_record[:, n_dof], F_record[:, n_dof], marker='.')
-    plt.xlabel('displacement')
-    plt.ylabel('force')
+#     plt.plot(x, 0.1 * x - 0.05 * x ** 2)
     plt.show()

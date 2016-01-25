@@ -197,7 +197,7 @@ if __name__ == '__main__':
 
     ts = TStepper()
     n_dofs = ts.domain.n_dofs
-    ts.bc_list = [BCDof(var='u', dof=0, value=0.0),
+    ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
                   BCDof(var='u', dof=n_dofs - 1, value=5.0)]
     tl = TLoop(ts=ts)
 

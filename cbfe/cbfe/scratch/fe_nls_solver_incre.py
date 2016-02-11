@@ -28,14 +28,14 @@ class MATSEval(HasTraits):
     def get_G(self, slip):
         #         return 0.1
         #         print 'slip', slip
-        return np.maximum(0.1 - 0.1 * slip, -0.005)
+        return np.maximum(10.0 - 10.0 * slip, -0.1)
 
     def get_bond(self, slip):
         x = slip
         y = np.zeros_like(x)
-        y[x < 1.05] = 0.1 * x[x < 1.05] - 0.05 * x[x < 1.05] ** 2
-        y[x > 1.05] = 0.1 * 1.05 - 0.05 * \
-            1.05 ** 2 - 0.005 * (x[x > 1.05] - 1.05)
+        y[x < 1.01] = 10. * x[x < 1.01] - 5. * x[x < 1.01] ** 2
+        y[x > 1.01] = 10. * 1.01 - 5. * \
+            1.01 ** 2 - 0.5 * (x[x > 1.01] - 1.01)
         return y
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1):
@@ -155,7 +155,7 @@ class TStepper(HasTraits):
         # Number of elements
         n_e_x = 4
         # length
-        L_x = 20.0
+        L_x = 200.0
         # Element definition
         domain = FEGrid(coord_max=(L_x,),
                         shape=(n_e_x,),
@@ -304,7 +304,7 @@ class TLoop(HasTraits):
     ts = Instance(TStepper)
     d_t = Float(0.01)
     t_max = Float(1.0)
-    k_max = Int(20)
+    k_max = Int(200)
     tolerance = Float(1e-8)
 
     def eval(self):
@@ -325,6 +325,7 @@ class TLoop(HasTraits):
 
         while t_n1 <= self.t_max:
             t_n1 = t_n + self.d_t
+            print t_n1
             k = 0
             step_flag = 'predictor'
             d_U = np.zeros(n_dofs)
@@ -343,6 +344,8 @@ class TLoop(HasTraits):
                     U_record = np.vstack((U_record, U_k))
                     break
                 k += 1
+                if k == self.k_max:
+                    print 'nonconvergence'
                 step_flag = 'corrector'
 
             t_n = t_n1
@@ -374,5 +377,5 @@ if __name__ == '__main__':
 #     plt.plot(x, y)
     plt.plot(U_record[:, n_dof], F_record[:, n_dof], marker='.')
     plt.xlabel('displacement')
-    plt.ylabel('force')
+    plt.ylabel('pull-out force')
     plt.show()

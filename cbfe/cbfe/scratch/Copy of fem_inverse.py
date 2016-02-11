@@ -22,10 +22,10 @@ from scipy.optimize import newton, brentq, bisect, minimize_scalar
 
 class MATSEval(HasTraits):
 
-    E_m = Float(28484, tooltip='Stiffness of the matrix',
+    E_m = Float(10, tooltip='Stiffness of the matrix',
                 auto_set=False, enter_set=False)
 
-    E_f = Float(170000, tooltip='Stiffness of the fiber',
+    E_f = Float(10, tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
     slip = List([0.])
@@ -60,28 +60,28 @@ class MATSEval(HasTraits):
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1):
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
-        D[:,:, 0, 0] = self.E_m
-        D[:,:, 2, 2] = self.E_f
+        D[:, :, 0, 0] = self.E_m
+        D[:, :, 2, 2] = self.E_f
 
 #         d = np.diff(self.bond) / np.diff(self.slip)
 #         d = np.append(d, np.nan)
-#
+
 #         G = interp1d(np.array(self.slip) * (1. + 1e-8), d, kind='zero')
 #         print d
 #         print G(np.array([[0.035, 0.0035], [0.0035, 0.0035]]))
 #         print self.slip
 #         a = eps[:,:, 1]
 #         print np.amax(a)
-        try:
-            D[:,:, 1, 1] = self.G(eps[:,:, 1])
-        except:
-            print np.array(self.slip)
-            print eps[:,:, 1]
-            sys.exit()
+#         try:
+        D[:, :, 1, 1] = self.G(eps[:,:, 1])
+#         except:
+#             print np.array(self.slip) * (1. + 1e-4)
+#             print eps[:, :, 1]
+#             sys.exit()
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
 
-        sig[:,:, 1] = self.b_s_law(eps[:,:, 1])
+        sig[:, :, 1] = self.b_s_law(eps[:,:, 1])
         return sig, D
 
     n_s = Constant(3)
@@ -97,8 +97,8 @@ class FETS1D52ULRH(FETSEval):
 
     debug_on = True
 
-    A_m = Float(120 * 13 - 9 * 1.85, desc='matrix area [mm2]')
-    A_f = Float(9 * 1.85, desc='reinforcement area [mm2]')
+    A_m = Float(1., desc='matrix area [mm2]')
+    A_f = Float(1., desc='reinforcement area [mm2]')
     L_b = Float(1., desc='perimeter of the bond interface [mm]')
 
     # Dimensional mapping
@@ -198,9 +198,9 @@ class TStepper(HasTraits):
     @cached_property
     def _get_domain(self):
         # Number of elements
-        n_e_x = 20
+        n_e_x = 4
         # length
-        L_x = 500.0
+        L_x = 200.0
         # Element definition
         domain = FEGrid(coord_max=(L_x,),
                         shape=(n_e_x,),
@@ -219,7 +219,7 @@ class TStepper(HasTraits):
         # [ d, n ]
         geo_r = fets_eval.geo_r.T
         # [ d, n, i ]
-        dNr_geo = geo_r[:,:, None] * np.array([1, 1]) * 0.5
+        dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
         # [ i, n, d ]
         dNr_geo = np.einsum('dni->ind', dNr_geo)
         # [ n_e, n_geo_r, n_dim_geo ]
@@ -258,7 +258,7 @@ class TStepper(HasTraits):
         # [ d, n ]
         geo_r = fets_eval.geo_r.T
         # [ d, n, i ]
-        dNr_geo = geo_r[:,:, None] * np.array([1, 1]) * 0.5
+        dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
         # [ i, n, d ]
         dNr_geo = np.einsum('dni->ind', dNr_geo)
 
@@ -266,8 +266,8 @@ class TStepper(HasTraits):
 
         # shape function for the unknowns
         # [ d, n, i]
-        Nr = 0.5 * (1. + geo_r[:,:, None] * r_ip[None,:])
-        dNr = 0.5 * geo_r[:,:, None] * np.array([1, 1])
+        Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None,:])
+        dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
 
         # [ i, n, d ]
         Nr = np.einsum('dni->ind', Nr)
@@ -280,9 +280,9 @@ class TStepper(HasTraits):
         B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
         B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
         B_factors = np.array([-1, 1], dtype='float_')
-        B[:,:,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
-                                              Nx[:,:, N_idx])
-        B[:,:,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
+        B[:, :,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
+                                              Nx[:, :, N_idx])
+        B[:, :,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
 
         return B
 
@@ -347,107 +347,100 @@ class TStepper(HasTraits):
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    d_t = Float(0.01)
+    d_t = Float(0.005)
     t_max = Float(1.0)
-    k_max = Int(2000)
-    tolerance = Float(1e-6)
+    k_max = Int(200)
+    tolerance = Float(1e-8)
     w_arr = Array
     pf_arr = Array
 
-    def pf(self, tau_i, w_i, eps, sig):
+    def pf(self, tau_i, eps, sig, t_n, d_t):
+        '''evaluate the pull-out force according to tau_i
+        '''
         eps_temp = np.copy(eps)
         sig_temp = np.copy(sig)
-        dw = w_i - self.ts.mats_eval.slip[-2]
-        n = 10.
-        d_t = dw / n
+        step_flag = 'predictor'
+        d_U_k = np.zeros(n_dofs)
         self.ts.mats_eval.bond[-1] = tau_i
-#         print d_t, 'dt'
-        for _ in range(int(n)):
-            step_flag = 'predictor'
-            d_U_k = np.zeros(n_dofs)
-            k = 0
-            while k < self.k_max:
-                R, K, eps_temp, sig_temp = ts.get_corr_pred(
-                    step_flag, d_U_k, eps_temp, sig_temp, 0., d_t)
-                F_ext = -R
-                K.apply_constraints(R)
-                d_U_k = K.solve()
-                k += 1
-                if k == self.k_max:
-                    print tau_i
-                    print np.linalg.norm(R)
-                    raise Exception('Non convergence')
-                step_flag = 'corrector'
-                if np.linalg.norm(R) < self.tolerance:
-                    #                     print F_ext[-1]
-                    break
-        return F_ext[-1]
+        k = 0
+        while k < self.k_max:
+            R, K, eps_temp, sig_temp = ts.get_corr_pred(
+                step_flag, d_U_k, eps_temp, sig_temp, t_n, t_n + d_t)
+            F_ext = -R
+            K.apply_constraints(R)
+            d_U_k = K.solve()
+            k += 1
+            if k == self.k_max:
+                print 'pf non-convergence'
+            step_flag = 'corrector'
+            if np.linalg.norm(R) < self.tolerance:
+                return F_ext[-1]
 
-    def update_eps_sig(self, w_i, eps, sig):
-
-        eps_temp = np.copy(eps)
-        sig_temp = np.copy(sig)
-        dw = w_i - self.ts.mats_eval.slip[-2]
-        n = 20.
-        d_t = dw / n
-
-        for _ in range(int(n)):
-            step_flag = 'predictor'
-            d_U_k = np.zeros(n_dofs)
-            k = 0
-            while k < self.k_max:
-                R, K, eps_temp, sig_temp = ts.get_corr_pred(
-                    step_flag, d_U_k, eps_temp, sig_temp, 0., d_t)
-                F_ext = -R
-                K.apply_constraints(R)
-                d_U_k = K.solve()
-                k += 1
-                if k == self.k_max:
-                    print np.linalg.norm(R)
-                    raise Exception('Non convergence')
-                step_flag = 'corrector'
-                if np.linalg.norm(R) < self.tolerance:
-                    break
-        return eps_temp, sig_temp
-
-    def pf_w(self, w):
-        return np.interp(w, self.w_arr, self.pf_arr)
-
-    def regularization(self, eps, sig, i):
+    def regularization(self, eps, sig, t_n, d_t, i):
         '''regularization
         '''
-        print i
         eps_temp = np.copy(eps)
         sig_temp = np.copy(sig)
-        d_w = self.w_arr[i] - self.w_arr[i - 1]
-        w_arr = [self.w_arr[i] - 0.5 * d_w,
-                 self.w_arr[i], self.w_arr[i] + 0.5 * d_w]
-        tau_i = 0.
-        for j in range(3):
-            print 'j', j
-            self.ts.mats_eval.slip.append(w_arr[j])
-            self.ts.mats_eval.bond.append(0.)
-#             print eps_temp, sig_temp
-            tau = lambda tau_i: self.pf(
-                tau_i, w_arr[j], eps_temp, sig_temp) - self.pf_w(w_arr[j])
-#             print eps_temp, sig_temp
-#             try:
-            tau_j = brentq(tau, 10., 200., xtol=1e-16)
-#             except:
-#                 tau_j = 0.
-            print tau_j
-            tau_i += tau_j
-            eps_temp, sig_temp = self.update_eps_sig(
-                w_arr[j], eps_temp, sig_temp)
 
-        del self.ts.mats_eval.slip[-3:]
-        del self.ts.mats_eval.bond[-3:]
+#         tau_i = 0.
+#
+#         pf = [0.5 * (self.pf_arr[i - 1] + self.pf_arr[i]),
+#               self.pf_arr[i], 0.5 * (self.pf_arr[i] + self.pf_arr[i + 1])]
+#
+#         for k, j in enumerate([0.5, 1.0, 1.5]):
+#             dw = self.w_arr[i] - self.w_arr[i - 1]
+#
+#             self.ts.mats_eval.slip.append(self.w_arr[i - 1] + j * dw)
+#             self.ts.mats_eval.bond.append(0.)
+#
+#             print j
+#
+#             tau = lambda tau_i: self.pf(
+#                 tau_i, eps_temp, sig_temp, t_n + (j - 0.5) * self.d_t, 0.5 * self.d_t) - pf[k]
+#             tau_i += brentq(tau, 0., 6., xtol=1e-16)
+#
+#             eps_temp, sig_temp = self.update_eps_sig(
+#                 eps_temp, sig_temp, t_n + (j - 0.5) * self.d_t, 0.5 * self.d_t)
+#
+#         del self.ts.mats_eval.slip[-3:]
+#         del self.ts.mats_eval.bond[-3:]
+#
+#         return tau_i / 3.
+        self.ts.mats_eval.slip.append(self.w_arr[i])
+        self.ts.mats_eval.bond.append(0.)
 
-        return tau_i / 3.
+        tau = lambda tau_i: self.pf(
+            tau_i, eps_temp, sig_temp, t_n, self.d_t) - self.pf_arr[i]
+
+#         print tau(0.)
+#         print tau(6.)
+        try:
+            tau_i = brentq(tau, 0., 20., xtol=1e-16)
+        except:
+            tau_i = 0
+        return tau_i
+
+    def update_eps_sig(self, eps, sig, t_n, t_n1):
+        step_flag = 'predictor'
+        d_U_k = np.zeros(n_dofs)
+        k = 0
+        while k < self.k_max:
+            R, K, eps, sig = self.ts.get_corr_pred(
+                step_flag, d_U_k, eps, sig, t_n, t_n1)
+            F_ext = -R
+            K.apply_constraints(R)
+            d_U_k = K.solve()
+            k += 1
+            step_flag = 'corrector'
+            if np.linalg.norm(R) < self.tolerance:
+                return eps, sig
 
     def eval(self):
 
-        ts.apply_essential_bc()
+        self.ts.apply_essential_bc()
+
+        t_n = 0.
+        t_n1 = t_n
         n_dofs = self.ts.domain.n_dofs
         n_e = self.ts.domain.n_active_elems
         n_ip = self.ts.fets_eval.n_gp
@@ -455,53 +448,63 @@ class TLoop(HasTraits):
 
         eps = np.zeros((n_e, n_ip, n_s))
         sig = np.zeros((n_e, n_ip, n_s))
+        i = 0.
 
-        i = 0
+        while t_n1 <= self.t_max:
+            i += 1.
+            print i
+            t_n1 = t_n + self.d_t
 
-        eps1 = np.copy(eps)
-        sig1 = np.copy(sig)
-
-        while i < len(self.w_arr) - 1:
-            i += 1
-
-#             tau_i = self.regularization(eps, sig, i)
+#             self.ts.mats_eval.slip.append(self.w_arr[i])
+#             self.ts.mats_eval.bond.append(0.)
+#             t_n1 = t_n + self.d_t
+#
+#             tau = lambda tau_i: self.pf(
+#                 tau_i, eps, sig, t_n, self.d_t) - self.pf_arr[i]
+#
+#             tau_i = brentq(tau, 0., 6., xtol=1e-16)
+#
 #             print tau_i
+
+            tau_i = self.regularization(eps, sig, t_n, self.d_t, i)
+
+            print tau_i
+
 #             self.ts.mats_eval.slip.append(self.w_arr[i])
 #             self.ts.mats_eval.bond.append(tau_i)
-#             eps, sig = self.update_eps_sig(self.w_arr[i], eps, sig)
+            eps, sig = self.update_eps_sig(eps, sig, t_n, t_n1)
 
-            self.ts.mats_eval.slip.append(self.w_arr[i])
-            self.ts.mats_eval.bond.append(0.)
-            print self.w_arr[i]
-            tau = lambda tau_i: self.pf(
-                tau_i, self.w_arr[i], eps1, sig1) - self.pf_arr[i]
-            try:
-                tau_i = brentq(tau, 0.1, 200., xtol=1e-16)
-            except:
-                print tau(0.1)
-                print tau(200)
-                plt.plot(self.ts.mats_eval.slip, self.ts.mats_eval.bond)
-                plt.xlabel('slip [mm]')
-                plt.ylabel('bond [N/mm]')
-                plt.show()
-            print tau_i
-            print '============='
-            self.ts.mats_eval.bond[-1] = tau_i
-#
-            eps1, sig1 = self.update_eps_sig(self.w_arr[i], eps1, sig1)
+#             step_flag = 'predictor'
+#             d_U_k = np.zeros(n_dofs)
+# self.ts.mats_eval.bond[-1] = tau_i
+#             k = 0
+#             while k < self.k_max:
+#                 R, K, eps, sig = ts.get_corr_pred(
+#                     step_flag, d_U_k, eps, sig, t_n, t_n1)
+#                 F_ext = -R
+#                 K.apply_constraints(R)
+#                 d_U_k = K.solve()
+# d_U += d_U_k
+#                 if np.linalg.norm(R) < self.tolerance:
+#                     print F_ext[-1]
+#                     print self.pf_arr[i]
+#                     print '===='
+#                     break
+#                 k += 1
+#                 step_flag = 'corrector'
 
-            if i % 2.0 == 0.:
-                b_avg = np.mean(self.ts.mats_eval.bond[-2:])
-                s_avg = np.mean(self.ts.mats_eval.slip[-2:])
-                del self.ts.mats_eval.bond[-2:]
-                del self.ts.mats_eval.slip[-2:]
-                self.ts.mats_eval.bond.append(b_avg)
-                self.ts.mats_eval.slip.append(s_avg)
+            # regularization
+#             if i % 2.0 == 0.:
+# print i
+# print self.ts.mats_eval.slip[-3:]
+#                 b_avg = np.mean(self.ts.mats_eval.bond[-2:])
+#                 s_avg = np.mean(self.ts.mats_eval.slip[-2:])
+#                 del self.ts.mats_eval.bond[-2:]
+#                 del self.ts.mats_eval.slip[-2:]
+#                 self.ts.mats_eval.bond.append(b_avg)
+#                 self.ts.mats_eval.slip.append(s_avg)
 
-                eps, sig = self.update_eps_sig(s_avg, eps, sig)
-                eps1 = np.copy(eps)
-                sig1 = np.copy(sig)
-
+            t_n = t_n1
         return self.ts.mats_eval.slip, self.ts.mats_eval.bond
 
 if __name__ == '__main__':
@@ -517,87 +520,34 @@ if __name__ == '__main__':
 
     tf = lambda t: 1 - np.abs(t - 1)
 
-    ts.bc_list = [BCDof(var='u', dof=20, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=1.)]
+    ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
+                  BCDof(var='u', dof=n_dofs - 1, value=3.5)]
 
-    ts.fets_eval.A_m = 3995.
-    ts.fets_eval.A_f = 4.895
+    w_arr, pf_arr = np.loadtxt('D:\\1.txt')
 
-#     w_arr, pf_arr = np.loadtxt('D:\\1.txt')
-#     fpath = 'D:\\data\\pull_out\\all\\DPO-30cm-0-3300SBR-v1g_R3_f.asc'
-#     x, y = np.loadtxt(fpath,  delimiter=';')
-    w_arr = np.linspace(0, 8, 1000)
-    import os
-    exp_data = np.zeros_like(w_arr)
-    home_dir = 'D:\\Eclipse\\'
-    for i in np.array([1, 2, 3, 4, 5]):
-        path = [home_dir, 'git',  # the path of the data file
-                'rostar',
-                'scratch',
-                'diss_figs',
-                'CB' + str(i) + '.txt']
-        filepath = os.path.join(*path)
-    #     exp_data = np.zeros_like(w_arr)
-        file1 = open(filepath, 'r')
-        cb = np.loadtxt(file1, delimiter=';')
-        test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
-        test_ydata = cb[:, 1]
-        interp = interp1d(
-            test_xdata, test_ydata, bounds_error=False, fill_value=0.)
-        exp_data += 0.2 * interp(w_arr)
+    intep = interp1d(w_arr, pf_arr)
 
-    x = w_arr
-    y = exp_data
-    plt.plot(x, y)
-    plt.show()
+    w_arr = np.linspace(0, 3.5, 201)
 
-    x[0] = 0.
-    y[0] = 0.
-#     x = np.array([0., 1.1295, 1.98864, 11.8682, 13.7705, 20.0602])
-#     y = np.array([0., 6.4088, 6.01772, 11.6052, 11.5493, 6.29709])
-
-    interp = interp1d(x / 2., y)
-
-    x = np.hstack((0, np.linspace(0.00001, 4., 10000)))
-
-    interp1 = interp1d(x, interp(x))
-
-#     w_arr = np.array([0., 1.1295, 1.98864, 3., 4., 5., 6., 7., 8.,
-# 9., 11.8682, 13.7705, 15., 16., 17., 18., 19., 20., ]) / 2.
-#     w_arr = np.hstack([0.0, 0.5, 1.2, 1.6, 2., 2.5,
-# 3., 3.5, 4., 4.5, 5., 5.5, 6., 6.5, 7., 7.5, 8., 8.5, 9., 9.5, 10.])
-#     w_arr = np.hstack(
-#         (np.linspace(0, 0.515, 7), 0.85, 1.05, np.linspace(1.35, 6.0, 10)))
-#     w_arr = np.hstack(
-#         (np.linspace(0, 0.125, 4), 0.37, np.linspace(0.64, 5.7, 30)))
-
-    w_arr = np.hstack((0., 0.40, np.linspace(0.8, 4.0, 41)))
-
-    pf_arr = interp1(w_arr) * 1000.
-
-#     plt.plot(w_arr, pf_arr)
-#     plt.show()
-
-#     plt.plot(w_arr, pf_arr)
-#     plt.plot(x / 2, y * 1000.)
-#
-#     plt.show()
+    pf_arr = intep(w_arr)
 
     tl = TLoop(ts=ts, w_arr=w_arr, pf_arr=pf_arr)
 
     slip, bond = tl.eval()
 
-    print slip
-    print bond
-
-    plt.plot(slip, bond)
+    plt.plot(slip, bond, label='solved')
 #     x = np.linspace(0., 3.5, 1000)
 #     y = np.zeros_like(x)
 #     y[x < 1.05] = 0.1 * x[x < 1.05] - 0.05 * x[x < 1.05] ** 2
-#
 #     y[x > 1.05] = 0.1 * 1.05 - 0.05 * \
 #         1.05 ** 2 - 0.005 * (x[x > 1.05] - 1.05)
-#     plt.plot(x, y)
-    plt.xlabel('slip [mm]')
-    plt.ylabel('bond [N/mm]')
+
+#     y[x < 1.01] = 1. * x[x < 1.01] - 0.5 * x[x < 1.01] ** 2
+#     y[x > 1.01] = 1. * 1.01 - 0.5 * \
+#         1.01 ** 2 - 0.01 * (x[x > 1.01] - 1.01)
+#
+#     plt.plot(x, y, 'k--', label='original')
+    plt.xlabel('slip')
+    plt.ylabel('bond')
+    plt.legend()
     plt.show()

@@ -3,20 +3,21 @@ Created on 12.01.2016
 
 @author: Yingxiong
 '''
-from matseval import MATSEval
-from fets1d52ulrh import FETS1D52ULRH
-from tstepper import TStepper
-from tloop import TLoop
-from matplotlib import pyplot as plt
-from ibvpy.api import BCDof
-from traits.api import HasTraits, Property, Instance, cached_property, Str, Button, Range, on_trait_change, Array, List, Float
 from matplotlib.figure import Figure
-from scratch.mpl_figure_editor import MPLFigureEditor
-from traitsui.api import View, Item, Group, HSplit, Handler, InstanceEditor, UItem, VGroup, TreeEditor, TreeNode, TableEditor, ListEditor, \
-    InstanceEditor
-from traitsui.menu import OKButton, CancelButton
-import numpy as np
 from scipy.interpolate import interp1d
+from traits.api import \
+    HasTraits, Property, Instance, cached_property, Str, Button, \
+    Range, on_trait_change, Array, List, Float
+from traitsui.api import \
+    View, Item, Group, VGroup, HSplit, TreeEditor, TreeNode
+
+from fets1d52ulrh import FETS1D52ULRH
+from ibvpy.api import BCDof
+from matseval import MATSEval
+import numpy as np
+from scratch.mpl_figure_editor import MPLFigureEditor
+from tloop import TLoop
+from tstepper import TStepper
 
 
 class Material(HasTraits):
@@ -300,10 +301,10 @@ class MainWindow(HasTraits):
                                     ],
                              orientation='vertical')
 
-    view = View(HSplit(Group(Item('tree',
-                                  editor=tree_editor,
-                                  show_label=False),
-                             Item('plot'),
+    view = View(HSplit(Group(VGroup(Item('tree',
+                                         editor=tree_editor,
+                                         show_label=False),
+                                    Item('plot', show_label=False)),
                              Item('time', label='t/T_max')),
                        Item('figure', editor=MPLFigureEditor(),
                             dock='vertical', width=0.7, height=0.9),

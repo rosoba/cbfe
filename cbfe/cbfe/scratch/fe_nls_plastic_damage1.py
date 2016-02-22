@@ -53,6 +53,8 @@ class MATSEval(HasTraits):
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1, alpha, q, kappa):
         #         g = lambda k: 0.8 - 0.8 * np.exp(-k)
         #         g = lambda k: 1. / (1 + np.exp(-2 * k + 6.))
+
+        sig_b_old = sig[:,:, 1]
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
         D[:,:, 0, 0] = self.E_m
@@ -77,8 +79,8 @@ class MATSEval(HasTraits):
         E_p = -self.E_b / (self.E_b + self.K_bar + self.H_bar) * derivative(self.g, kappa, dx=1e-6) * sig_e \
             + (1 - w) * self.E_b * (self.K_bar + self.H_bar) / \
             (self.E_b + self.K_bar + self.H_bar)
-
         D[:,:, 1, 1] = (1-w)*self.E_b*elas + E_p*plas
+#         D[:,:, 1, 1] = (sig[:,:, 1] - sig_b_old)/d_eps[:,:, 1]
 
         return sig, D, alpha, q, kappa
 
@@ -198,9 +200,9 @@ class TStepper(HasTraits):
     @cached_property
     def _get_domain(self):
         # Number of elements
-        n_e_x = 60
+        n_e_x = 10
         # length
-        L_x = 600.
+        L_x = 200.
         # Element definition
         domain = FEGrid(coord_max=(L_x,),
                         shape=(n_e_x,),
@@ -347,7 +349,7 @@ class TStepper(HasTraits):
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    d_t = Float(0.005)
+    d_t = Float(0.01)
     t_max = Float(2.0)
     k_max = Int(50)
     tolerance = Float(1e-5)
@@ -411,6 +413,7 @@ class TLoop(HasTraits):
 #                     alpha_r = alpha
 #                     q_r = q
 #                     kappa_r = kappa
+                    print t_n1
                     break
                 k += 1
                 step_flag = 'corrector'

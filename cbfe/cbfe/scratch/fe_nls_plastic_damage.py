@@ -11,7 +11,7 @@ from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-from scipy.optimize import root
+from scipy.optimize import root, newton_krylov, anderson, diagbroyden
 from scipy.misc import derivative
 
 
@@ -31,7 +31,7 @@ class MATSEval(HasTraits):
                     enter_set=True,
                     auto_set=False)
 
-    K_bar = Float(0.08,  # 191e-6,
+    K_bar = Float(0.01,  # 191e-6,
                   label="K",
                   desc="Plasticity modulus",
                   enter_set=True,
@@ -47,9 +47,20 @@ class MATSEval(HasTraits):
     beta = Float(1.0)
 #     g = lambda self, k: 1. / (1 + np.exp(-self.alpha * k + 6.)) * self.beta
     g = lambda self, k: 0.
+    np.random
 
     # nonlinear hardening law
-    A = lambda self, a: self.E_b * (a - a ** 2)
+#     A = lambda self, a: self.E_b * (a - 0.2 * a ** 2)
+#     A = lambda self, a: self.K_bar * a
+#     A = lambda self, a: 0.01 * a ** 2 - 0.01 * a
+    def A(self, a):
+        x = np.linspace(0, 5, 13)
+        d_x = np.diff(x)
+        k = [-0.1, 0.1, 0.2, 0.5, -0.1, 0.1, 0.2, 0.5, -0.1, 0.1, 0.2, 0.5]
+        y = np.hstack((0., np.cumsum(k * d_x)))
+# return 0.1 * k * a * (a <= 1.) + k * (a - 1.) * (a > 2.) + 0.1 * k * 2.
+# * (a > 2.)
+        return np.interp(a, x, y)
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1, alpha, q, kappa):
         #         g = lambda k: 0.8 - 0.8 * np.exp(-k)
@@ -61,20 +72,26 @@ class MATSEval(HasTraits):
         sig_trial = sig[:,:, 1]/(1-self.g(kappa)) + self.E_b * d_eps[:,:, 1]
         xi_trial = sig_trial - q
         f_trial = abs(xi_trial) - (self.sigma_y + self.A(alpha))
+#         f_trial = abs(xi_trial) - (self.sigma_y + self.K_bar * alpha)
         elas = f_trial <= 1e-8
         plas = f_trial > 1e-8
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
 
-        print 'f_trail', f_trial.shape
-        print 'alpha', alpha.shape
-        print 'A', self.A(alpha).shape
-        print 'elas', elas.shape
-        print 'plas', plas.shape
-
         f_n1 = lambda dgamma: (
-            f_trial - self.E_b * dgamma - self.A(alpha + dgamma) + self.A(alpha)) * plas + dgamma * elas
-        d_gamma = root(f_n1, np.zeros_like(f_trial)).x
+            f_trial - self.E_b * dgamma - self.A(alpha + dgamma) + self.A(alpha)) * plas
+
+#         try:
+        d_gamma = newton_krylov(f_n1, np.zeros_like(f_trial))
+        d_gamma = d_gamma * plas
+#         except:
+#             print alpha
+#             print self.sigma_y + self.A(alpha)
+#             sys.exit()
+#         Q = 0.1
+#         a = Q * self.E_b
+#         b = 2 * alpha * Q - 2 * self.E_b
+#         d_gamma = (-b + np.sqrt(b ** 2 - 4 * a * f_trial)) / 2 * a * plas
 #         d_gamma = f_trial / (self.E_b + self.K_bar + self.H_bar) * plas
         alpha += d_gamma
         kappa += d_gamma
@@ -84,9 +101,9 @@ class MATSEval(HasTraits):
         sig_e = sig_trial - d_gamma * self.E_b * np.sign(xi_trial)
         sig[:,:, 1] = (1-w)*sig_e
 
-        E_p = -self.E_b / (self.E_b + self.K_bar + self.H_bar) * derivative(self.g, kappa, dx=1e-6) * sig_e \
-            + (1 - w) * self.E_b * (self.K_bar + self.H_bar) / \
-            (self.E_b + self.K_bar + self.H_bar)
+        aAaa = derivative(self.A, alpha, dx=1e-6)
+        E_p = -np.sign(xi_trial) * self.E_b / (self.E_b + aAaa) * derivative(self.g, kappa, dx=1e-6) * sig_e \
+            + (1 - w) * self.E_b * aAaa / (self.E_b + aAaa)
 
         D[:,:, 1, 1] = (1-w)*self.E_b*elas + E_p*plas
 
@@ -389,7 +406,7 @@ class TStepper(HasTraits):
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    d_t = Float(0.01)
+    d_t = Float(0.005)
     t_max = Float(1.0)
     k_max = Int(50)
     tolerance = Float(1e-5)
@@ -420,6 +437,7 @@ class TLoop(HasTraits):
 
         while t_n1 <= self.t_max:
             t_n1 = t_n + self.d_t
+            print t_n1
             k = 0
             scale = 1.0
             step_flag = 'predictor'
@@ -440,8 +458,13 @@ class TLoop(HasTraits):
                 #                     q = q_r
                 #                     kappa = kappa_r
 
-                R, K, eps, sig, alpha, q, kappa = self.ts.get_corr_pred(
-                    step_flag, U_k, d_U_k, eps, sig, t_n, t_n1, alpha, q, kappa)
+                try:
+                    R, K, eps, sig, alpha, q, kappa = self.ts.get_corr_pred(
+                        step_flag, U_k, d_U_k, eps, sig, t_n, t_n1, alpha, q, kappa)
+                except:
+                    n_dof = 2 * ts.domain.n_active_elems + 1
+                    plt.plot(U_record[:, n_dof] * 2, F_record[:, n_dof] / 1000)
+                    plt.show()
 
                 F_ext = -R
                 K.apply_constraints(R)
@@ -490,7 +513,7 @@ if __name__ == '__main__':
 #     print U_record[:, n_dof]
 #     print F_record[:, n_dof]
     plt.plot(U_record[:, n_dof] * 2, F_record[:, n_dof] / 1000, marker='.')
-    plt.ylim(0, 35)
+#     plt.ylim(0, 35)
     plt.xlabel('displacement')
     plt.ylabel('force')
     plt.show()

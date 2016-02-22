@@ -99,16 +99,20 @@ plt.plot(x, np.interp(x, slip8, bond8), '--', label='40-v3_r3')
 
 y = (np.interp(x, slip4, bond4) + np.interp(x, slip5, bond5) + np.interp(x, slip1, bond1) + np.interp(x, slip2, bond2) +
      np.interp(x, slip3, bond3) + np.interp(x, slip6, bond6) + np.interp(x, slip7, bond7) + np.interp(x, slip8, bond8)) / 8.
-# plt.plot(x, y, '-r', label='avg-all', lw=2)
+plt.plot(x, y, '-r', label='avg-all', lw=2)
 
 plt.plot(x, np.interp(x, slip9, bond9), 'r', lw=2, label='20-v3_r3_unloading')
 plt.plot(x, np.interp(x, slip10, bond10), 'k',
          lw=2, label='15-v1_r3_unloading')
 
+print [x[x <= 1.5]]
+print [y[x <= 1.5]]
 
 plt.xlabel('slip [mm]')
 plt.ylabel('bond [N/mm]')
 plt.legend(loc='best', ncol=2)
+
+plt.show()
 
 ts = TStepper()
 n_dofs = ts.domain.n_dofs

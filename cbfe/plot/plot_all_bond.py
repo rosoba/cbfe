@@ -5,7 +5,7 @@ Created on 03.02.2016
 '''
 import matplotlib.pyplot as plt
 import numpy as np
-from fe_nls_solver_incre1 import MATSEval, FETS1D52ULRH, TStepper, TLoop
+from scratch.fe_nls_solver_incre1 import MATSEval, FETS1D52ULRH, TStepper, TLoop
 from ibvpy.api import BCDof
 
 

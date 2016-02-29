@@ -515,41 +515,16 @@ if __name__ == '__main__':
 
     n_dofs = ts.domain.n_dofs
 
-    tf = lambda t: 1 - np.abs(t - 1)
-
-    ts.bc_list = [BCDof(var='u', dof=20, value=0.0),
+    ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
                   BCDof(var='u', dof=n_dofs - 1, value=1.)]
 
-    ts.fets_eval.A_m = 3995.
-    ts.fets_eval.A_f = 4.895
+    fpath = 'D:\\data\\pull_out\\all\\DPO-30cm-0-3300SBR-v1g_R3_f.asc'
+    x, y = np.loadtxt(fpath,  delimiter=';')
 
-#     w_arr, pf_arr = np.loadtxt('D:\\1.txt')
-#     fpath = 'D:\\data\\pull_out\\all\\DPO-30cm-0-3300SBR-v1g_R3_f.asc'
-#     x, y = np.loadtxt(fpath,  delimiter=';')
-    w_arr = np.linspace(0, 8, 1000)
-    import os
-    exp_data = np.zeros_like(w_arr)
-    home_dir = 'D:\\Eclipse\\'
-    for i in np.array([1, 2, 3, 4, 5]):
-        path = [home_dir, 'git',  # the path of the data file
-                'rostar',
-                'scratch',
-                'diss_figs',
-                'CB' + str(i) + '.txt']
-        filepath = os.path.join(*path)
-    #     exp_data = np.zeros_like(w_arr)
-        file1 = open(filepath, 'r')
-        cb = np.loadtxt(file1, delimiter=';')
-        test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
-        test_ydata = cb[:, 1]
-        interp = interp1d(
-            test_xdata, test_ydata, bounds_error=False, fill_value=0.)
-        exp_data += 0.2 * interp(w_arr)
-
-    x = w_arr
-    y = exp_data
-    plt.plot(x, y)
-    plt.show()
+#     x = w_arr
+#     y = pf_arr
+#     plt.plot(x, y)
+#     plt.show()
 
     x[0] = 0.
     y[0] = 0.

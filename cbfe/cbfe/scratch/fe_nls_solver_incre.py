@@ -25,10 +25,12 @@ class MATSEval(HasTraits):
 
 #     G = Float(0.1, tooltip='Bond stiffness')
 
+    a = Float(1.0)
+
     def get_G(self, slip):
         #         return 0.1
         #         print 'slip', slip
-        return np.maximum(10.0 - 10.0 * slip, -0.1)
+        return self.a * np.maximum(10.0 - 10.0 * slip, -0.1)
 
     def get_bond(self, slip):
         x = slip
@@ -36,7 +38,7 @@ class MATSEval(HasTraits):
         y[x < 1.01] = 10. * x[x < 1.01] - 5. * x[x < 1.01] ** 2
         y[x > 1.01] = 10. * 1.01 - 5. * \
             1.01 ** 2 - 0.5 * (x[x > 1.01] - 1.01)
-        return y
+        return self.a * y
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1):
         n_e, n_ip, n_s = eps.shape
@@ -369,13 +371,25 @@ if __name__ == '__main__':
 
     tl = TLoop(ts=ts)
 
-    U_record, F_record = tl.eval()
-    n_dof = 2 * ts.domain.n_active_elems + 1
-    np.savetxt('D:\\1.txt', np.vstack((
-        U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
+    a_arr = np.random.normal(loc=1.0, scale=0.1, size=20)
+
+    U_avg = []
+    F_avg = []
+
+    for a in a_arr:
+        ts.mats_eval.a = a
+        U_record, F_record = tl.eval()
+        n_dof = 2 * ts.domain.n_active_elems + 1
+#     np.savetxt('D:\\1.txt', np.vstack((
+#         U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
 #     x, y = np.loadtxt('D:\\1.txt')
 #     plt.plot(x, y)
-    plt.plot(U_record[:, n_dof], F_record[:, n_dof], marker='.')
+#     plt.plot(U_record[:, n_dof], F_record[:, n_dof], marker='.')
+        U_avg.append(U_record[:, n_dof])
+        F_avg.append(F_record[:, n_dof])
+    plt.plot(np.average(U_avg, axis=0), np.average(
+        F_avg, axis=0), 'b--', label='average of 100 yarns')
+
     plt.xlabel('displacement')
     plt.ylabel('pull-out force')
     plt.show()

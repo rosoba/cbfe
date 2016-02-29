@@ -21,8 +21,8 @@ from tstepper import TStepper
 
 
 class Material(HasTraits):
-    sigma_y = Range(0.5, 5.5, value=1.05)
-    E_b = Range(1.0, 8.0, value=2.0)
+    sigma_y = Range(0.5, 55, value=1.05)
+    E_b = Range(1.0, 80, value=2.0)
     K_bar = Range(-0.01, 0.15, value=0.08)
     H_bar = Range(-0.1, 0.1, value=0.00)
     alpha = Range(0.50, 2.50, value=1.0)

@@ -229,6 +229,10 @@ class MainWindow(HasTraits):
         l_sig1, = self.ax6.plot(X_ip, self.sig_record[-1][:, :, 2].flatten())
         self.ax6.set_title('stress')
 
+        self.ax3.set_ylim(np.amin(self.sf_record), np.amax(self.sf_record))
+        self.ax4.set_ylim(np.amin(self.U_record), np.amax(self.U_record))
+        self.ax6.set_ylim(np.amin(self.sig_record), np.amax(self.sig_record))
+
         self.figure.canvas.draw()
 
     time = Range(0.00, 1.00, value=1.00)
@@ -267,6 +271,10 @@ class MainWindow(HasTraits):
         l_sig0, = self.ax6.plot(X_ip, self.sig_record[idx][:, :, 0].flatten())
         l_sig1, = self.ax6.plot(X_ip, self.sig_record[idx][:, :, 2].flatten())
         self.ax6.set_title('stress')
+
+        self.ax3.set_ylim(np.amin(self.sf_record), np.amax(self.sf_record))
+        self.ax4.set_ylim(np.amin(self.U_record), np.amax(self.U_record))
+        self.ax6.set_ylim(np.amin(self.sig_record), np.amax(self.sig_record))
 
         self.figure.canvas.draw()
 

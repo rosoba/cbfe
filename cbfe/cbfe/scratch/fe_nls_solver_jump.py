@@ -1,8 +1,3 @@
-'''
-Created on 19.01.2016
-
-@author: Yingxiong
-'''
 from envisage.ui.workbench.api import WorkbenchApplication
 from mayavi.sources.api import VTKDataSource, VTKFileReader
 from traits.api import implements, Int, Array, HasTraits, Instance, \
@@ -17,26 +12,69 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 from scipy.interpolate import interp1d
-from scipy.optimize import newton, brentq, bisect, minimize_scalar
 
 
 class MATSEval(HasTraits):
 
-    E_m = Float(10, tooltip='Stiffness of the matrix',
+    E_m = Float(28484, tooltip='Stiffness of the matrix',
                 auto_set=False, enter_set=False)
 
-    E_f = Float(10, tooltip='Stiffness of the fiber',
+    E_f = Float(170000, tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
-    slip = List([0.])
+    # 30-v1g-r3-f
+#     slip = List([0.0, 0.38461538461538458, 0.89743589743589736, 1.4102564102564101, 1.9230769230769229, 2.4358974358974357, 2.9487179487179485, 3.4615384615384612, 3.974358974358974, 4.4871794871794872,
+#                  5.0, 5.5128205128205128, 6.0256410256410255, 6.5384615384615383, 7.0512820512820511, 7.5641025641025639, 8.0769230769230766, 8.5897435897435876, 9.1025641025641022, 9.6153846153846132, 10.0])
+#     bond = List([0.0, 41.131553809206011, 39.936804665067541, 43.088224620622753, 47.650913085297518, 52.479625415305165, 57.394429686101795, 62.251107904045313, 66.738355595565764, 70.767647986595335, 73.873975043302551,
+# 76.009215625340516, 77.277633801765163, 76.270142784043799,
+# 73.416598577944114, 69.69994680116541, 64.730320409930115,
+# 58.933638345787244, 52.554181600645506, 45.626326986883868,
+# 39.96573453999463])
 
-    bond = List([0.])
+    # 30-v2-r3-f
+#     slip = List([0.0, 0.055714285714285716, 0.13, 0.20428571428571429, 0.40500000000000003, 0.95862068965517244, 1.5931034482758619, 2.2275862068965515, 2.8620689655172411, 3.4965517241379307,
+#                  4.1310344827586203, 4.7655172413793103, 5.3999999999999986, 6.0344827586206886, 6.6689655172413786, 7.3034482758620687, 7.9379310344827569, 8.572413793103447, 9.2068965517241388, 9.841379310344827])
+#     bond = List([0.0, 15.00385088356251, 35.008985394979184, 55.014119906395834, 43.133431746905352, 42.22129154275072, 46.457189937422498, 52.421832224015986, 58.214528732629347, 63.443110953129597,
+# 65.081745830172082, 70.818555581926134, 76.171908502739569,
+# 80.423245044030807, 83.434389826392007, 85.024361743793122,
+# 82.174874390870798, 76.343148188571817, 66.095308161727061,
+# 54.526649351153921])
 
-#     b_s_law = Property
-#
-#     def _get_b_s_law(self):
-#         return interp1d(self.slip, self.bond)
-# return np.interp(self.slip, self.bond)
+    # 30-v3-r3-f
+#     slip = List([0.0, 0.061874999999999999, 0.144375, 0.22687499999999999, 0.30937500000000001, 0.72500000000000009, 1.2758620689655173, 1.9103448275862067, 2.5448275862068965, 3.1793103448275857,
+#                  3.8137931034482757, 4.4482758620689644, 5.0827586206896544, 5.7172413793103445, 6.3517241379310345, 6.9862068965517228, 7.6206896551724128, 8.2551724137931028, 8.8896551724137929, 9.5241379310344811, 10.0])
+#     bond = List([0.0, 16.27428330083729, 37.973327701953664, 59.672372103070117, 43.400401511742785, 43.234649080448378, 48.701090597581455, 54.736977654692424, 62.048663399413229, 69.370097603432924, 77.083431690155379,
+# 83.982393896019687, 88.794804003264773, 92.364321409231025,
+# 92.988748502860574, 90.587882722159577, 85.05512495854191,
+# 80.343909075206099, 75.103929360931232, 66.591754226257905,
+# 62.36344706176229])
+
+    # 20-v1-r3-f
+#     slip = List([0.0, 0.029062499999999998, 0.067812499999999998, 0.1065625, 0.14531250000000001, 0.29999999999999999, 0.75, 1.34375, 1.9354166666666668, 2.5270833333333336,
+#                  3.1187499999999999, 3.7104166666666667, 4.3020833333333339, 4.8937500000000007, 5.4854166666666675, 6.0770833333333343, 6.6687500000000011, 7.2604166666666679, 7.8520833333333337])
+#     bond = List([0.0, 16.539040266437738, 38.591093955021357, 60.643147643604991, 55.492896981222152, 33.361147503574301, 41.750737025152148, 45.341604537187422, 53.984990428825952, 62.276659123066786,
+# 70.624931767476426, 77.79727324562819, 82.881005240210555,
+# 83.82596383699105, 85.775479050115678, 85.647895874781625,
+# 82.121406801790954, 78.787654614781076, 74.308361153830276])
+
+    # 20-v2-r3-f
+#     slip = List([0.0, 0.025312500000000002, 0.059062500000000004, 0.092812500000000006, 0.12656250000000002, 0.28999999999999998, 0.75, 1.34375, 1.9354166666666668, 2.5270833333333336,
+#                  3.1187499999999999, 3.7104166666666667, 4.3020833333333339, 4.8937500000000007, 5.4854166666666675, 6.0770833333333343, 6.6687500000000011, 7.2604166666666679, 7.8520833333333337])
+#     bond = List([0.0, 16.497410959806412, 38.493958906214978, 60.490506852623582, 53.730724862691076, 32.368976701926144, 46.320380964466182, 53.362551389229182, 60.895571700733498, 70.421645193646242,
+# 81.283769953964168, 88.218274137431948, 92.648027453513293,
+# 97.858499164610748, 99.266642697732422, 91.860288624493535,
+# 78.662911574914844, 64.495097443305497, 53.318329359069025])
+
+    # 30-v1g
+#     slip = List([0.0, 0.3125, 0.72916666666666674, 1.1458333333333335, 1.5625, 1.9791666666666667, 2.3958333333333335,
+#                  2.8125, 3.229166666666667, 3.6458333333333335, 4.0625, 4.479166666666667, 4.8958333333333339])
+#     bond = List([0.0, 36.778418900302242, 39.758442442202977, 40.884882306336046, 44.445217145181815, 48.118479636057231,
+# 52.070269352966747, 56.040212250977582, 60.060774337096234,
+# 63.945337675621374, 67.39679786075925, 70.738985619426003,
+# 73.401606879129417])
+    slip = List
+    bond = List
+
     def b_s_law(self, x):
         return np.interp(x, self.slip, self.bond)
 
@@ -50,37 +88,15 @@ class MATSEval(HasTraits):
         x[x < self.slip[0]] = self.slip[-1] + 10000.
         y[x <= self.slip[-1]] = G(x[x <= self.slip[-1]])
         return y
-#     G = Property
-#
-#     def _get_G(self):
-#         d = np.diff(self.bond) / np.diff(self.slip)
-#         d = np.append(d, np.nan)
-#         return interp1d(self.slip, d, kind='zero')
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1):
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
         D[:, :, 0, 0] = self.E_m
         D[:, :, 2, 2] = self.E_f
-
-#         d = np.diff(self.bond) / np.diff(self.slip)
-#         d = np.append(d, np.nan)
-
-#         G = interp1d(np.array(self.slip) * (1. + 1e-8), d, kind='zero')
-#         print d
-#         print G(np.array([[0.035, 0.0035], [0.0035, 0.0035]]))
-#         print self.slip
-#         a = eps[:,:, 1]
-#         print np.amax(a)
-#         try:
         D[:, :, 1, 1] = self.G(eps[:,:, 1])
-#         except:
-#             print np.array(self.slip) * (1. + 1e-4)
-#             print eps[:, :, 1]
-#             sys.exit()
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
-
         sig[:, :, 1] = self.b_s_law(eps[:,:, 1])
         return sig, D
 
@@ -97,8 +113,8 @@ class FETS1D52ULRH(FETSEval):
 
     debug_on = True
 
-    A_m = Float(1., desc='matrix area [mm2]')
-    A_f = Float(1., desc='reinforcement area [mm2]')
+    A_m = Float(120 * 13 - 9 * 1.85, desc='matrix area [mm2]')
+    A_f = Float(9 * 1.85, desc='reinforcement area [mm2]')
     L_b = Float(1., desc='perimeter of the bond interface [mm]')
 
     # Dimensional mapping
@@ -134,6 +150,7 @@ class FETS1D52ULRH(FETSEval):
         return np.array([1., 1.], dtype=float)
 
     # Integration parameters
+    #
     ngp_r = 2
 
     def get_N_geo_mtx(self, r_pnt):
@@ -192,24 +209,26 @@ class TStepper(HasTraits):
     def _get_A(self):
         return np.array([self.fets_eval.A_m, self.fets_eval.L_b, self.fets_eval.A_f])
 
-    domain = Property(Instance(FEGrid))
+    # number of elements
+    n_e_x = Float(20.)
+
+    # specimen length
+    L_x = Float(75.)
+
+    domain = Property(depends_on='n_e_x, L_x')
     '''Diescretization object.
     '''
     @cached_property
     def _get_domain(self):
-        # Number of elementsx
-        n_e_x = 4
-        # length
-        L_x = 40.0
         # Element definition
-        domain = FEGrid(coord_max=(L_x,),
-                        shape=(n_e_x,),
+        domain = FEGrid(coord_max=(self.L_x,),
+                        shape=(self.n_e_x,),
                         fets_eval=self.fets_eval)
         return domain
 
     bc_list = List(Instance(BCDof))
 
-    J_mtx = Property
+    J_mtx = Property(depends_on='n_e_x, L_x')
     '''Array of Jacobian matrices.
     '''
     @cached_property
@@ -228,14 +247,14 @@ class TStepper(HasTraits):
         J_mtx = np.einsum('ind,enf->eidf', dNr_geo, elem_x_map)
         return J_mtx
 
-    J_det = Property
+    J_det = Property(depends_on='n_e_x, L_x')
     '''Array of Jacobi determinants.
     '''
     @cached_property
     def _get_J_det(self):
         return np.linalg.det(self.J_mtx)
 
-    B = Property
+    B = Property(depends_on='n_e_x, L_x')
     '''The B matrix
     '''
     @cached_property
@@ -351,89 +370,6 @@ class TLoop(HasTraits):
     t_max = Float(1.0)
     k_max = Int(200)
     tolerance = Float(1e-8)
-    w_arr = Array
-    pf_arr = Array
-
-    def pf(self, tau_i, eps, sig, t_n, d_t):
-        '''evaluate the pull-out force according to tau_i
-        '''
-        eps_temp = np.copy(eps)
-        sig_temp = np.copy(sig)
-        step_flag = 'predictor'
-        d_U_k = np.zeros(n_dofs)
-        self.ts.mats_eval.bond[-1] = tau_i
-        k = 0
-        while k < self.k_max:
-            R, K, eps_temp, sig_temp = ts.get_corr_pred(
-                step_flag, d_U_k, eps_temp, sig_temp, t_n, t_n + d_t)
-            F_ext = -R
-            K.apply_constraints(R)
-            d_U_k = K.solve()
-            k += 1
-            if k == self.k_max:
-                print 'pf non-convergence'
-            step_flag = 'corrector'
-            if np.linalg.norm(R) < self.tolerance:
-                return F_ext[-1]
-
-    def regularization(self, eps, sig, t_n, d_t, i):
-        '''regularization
-        '''
-        eps_temp = np.copy(eps)
-        sig_temp = np.copy(sig)
-
-#         tau_i = 0.
-#
-#         pf = [0.5 * (self.pf_arr[i - 1] + self.pf_arr[i]),
-#               self.pf_arr[i], 0.5 * (self.pf_arr[i] + self.pf_arr[i + 1])]
-#
-#         for k, j in enumerate([0.5, 1.0, 1.5]):
-#             dw = self.w_arr[i] - self.w_arr[i - 1]
-#
-#             self.ts.mats_eval.slip.append(self.w_arr[i - 1] + j * dw)
-#             self.ts.mats_eval.bond.append(0.)
-#
-#             print j
-#
-#             tau = lambda tau_i: self.pf(
-#                 tau_i, eps_temp, sig_temp, t_n + (j - 0.5) * self.d_t, 0.5 * self.d_t) - pf[k]
-#             tau_i += brentq(tau, 0., 6., xtol=1e-16)
-#
-#             eps_temp, sig_temp = self.update_eps_sig(
-#                 eps_temp, sig_temp, t_n + (j - 0.5) * self.d_t, 0.5 * self.d_t)
-#
-#         del self.ts.mats_eval.slip[-3:]
-#         del self.ts.mats_eval.bond[-3:]
-#
-#         return tau_i / 3.
-        self.ts.mats_eval.slip.append(self.w_arr[i])
-        self.ts.mats_eval.bond.append(0.)
-
-        tau = lambda tau_i: self.pf(
-            tau_i, eps_temp, sig_temp, t_n, self.d_t) - self.pf_arr[i]
-
-#         print tau(0.)
-#         print tau(6.)
-        try:
-            tau_i = brentq(tau, 0., 20., xtol=1e-16)
-        except:
-            tau_i = 0
-        return tau_i
-
-    def update_eps_sig(self, eps, sig, t_n, t_n1):
-        step_flag = 'predictor'
-        d_U_k = np.zeros(n_dofs)
-        k = 0
-        while k < self.k_max:
-            R, K, eps, sig = self.ts.get_corr_pred(
-                step_flag, d_U_k, eps, sig, t_n, t_n1)
-            F_ext = -R
-            K.apply_constraints(R)
-            d_U_k = K.solve()
-            k += 1
-            step_flag = 'corrector'
-            if np.linalg.norm(R) < self.tolerance:
-                return eps, sig
 
     def eval(self):
 
@@ -445,67 +381,39 @@ class TLoop(HasTraits):
         n_e = self.ts.domain.n_active_elems
         n_ip = self.ts.fets_eval.n_gp
         n_s = self.ts.mats_eval.n_s
-
+        U_record = np.zeros(n_dofs)
+        F_record = np.zeros(n_dofs)
+        U_k = np.zeros(n_dofs)
         eps = np.zeros((n_e, n_ip, n_s))
         sig = np.zeros((n_e, n_ip, n_s))
-        i = 0.
 
         while t_n1 <= self.t_max:
-            i += 1.
-            print i
             t_n1 = t_n + self.d_t
+            print t_n1
+            k = 0
+            step_flag = 'predictor'
+            d_U = np.zeros(n_dofs)
+            d_U_k = np.zeros(n_dofs)
+            while k < self.k_max:
+                R, K, eps, sig = self.ts.get_corr_pred(
+                    step_flag, d_U_k, eps, sig, t_n, t_n1)
 
-#             self.ts.mats_eval.slip.append(self.w_arr[i])
-#             self.ts.mats_eval.bond.append(0.)
-#             t_n1 = t_n + self.d_t
-#
-#             tau = lambda tau_i: self.pf(
-#                 tau_i, eps, sig, t_n, self.d_t) - self.pf_arr[i]
-#
-#             tau_i = brentq(tau, 0., 6., xtol=1e-16)
-#
-#             print tau_i
-
-            tau_i = self.regularization(eps, sig, t_n, self.d_t, i)
-
-            print tau_i
-
-#             self.ts.mats_eval.slip.append(self.w_arr[i])
-#             self.ts.mats_eval.bond.append(tau_i)
-            eps, sig = self.update_eps_sig(eps, sig, t_n, t_n1)
-
-#             step_flag = 'predictor'
-#             d_U_k = np.zeros(n_dofs)
-# self.ts.mats_eval.bond[-1] = tau_i
-#             k = 0
-#             while k < self.k_max:
-#                 R, K, eps, sig = ts.get_corr_pred(
-#                     step_flag, d_U_k, eps, sig, t_n, t_n1)
-#                 F_ext = -R
-#                 K.apply_constraints(R)
-#                 d_U_k = K.solve()
-# d_U += d_U_k
-#                 if np.linalg.norm(R) < self.tolerance:
-#                     print F_ext[-1]
-#                     print self.pf_arr[i]
-#                     print '===='
-#                     break
-#                 k += 1
-#                 step_flag = 'corrector'
-
-            # regularization
-#             if i % 2.0 == 0.:
-# print i
-# print self.ts.mats_eval.slip[-3:]
-#                 b_avg = np.mean(self.ts.mats_eval.bond[-2:])
-#                 s_avg = np.mean(self.ts.mats_eval.slip[-2:])
-#                 del self.ts.mats_eval.bond[-2:]
-#                 del self.ts.mats_eval.slip[-2:]
-#                 self.ts.mats_eval.bond.append(b_avg)
-#                 self.ts.mats_eval.slip.append(s_avg)
+                F_ext = -R
+                K.apply_constraints(R)
+                d_U_k = K.solve()
+                d_U += d_U_k
+                if np.linalg.norm(R) < self.tolerance:
+                    F_record = np.vstack((F_record, F_ext))
+                    U_k += d_U
+                    U_record = np.vstack((U_record, U_k))
+                    break
+                k += 1
+                if k == self.k_max:
+                    print 'nonconvergence'
+                step_flag = 'corrector'
 
             t_n = t_n1
-        return self.ts.mats_eval.slip, self.ts.mats_eval.bond
+        return U_record, F_record
 
 if __name__ == '__main__':
 
@@ -516,39 +424,49 @@ if __name__ == '__main__':
 
     ts = TStepper()
 
+#     x, y = np.loadtxt('D:\\bondlaw.txt')
+#
+    ts.mats_eval.slip = [0.0, 0.09375, 0.505, 0.90172413793103456, 1.2506896551724138, 1.5996551724137933, 1.9486206896551728, 2.2975862068965522, 2.6465517241379315,
+                         2.9955172413793107, 3.34448275862069, 3.6934482758620693, 4.0424137931034485, 4.3913793103448278, 4.7403448275862079, 5.0893103448275863, 5.4382758620689664, 5.7000000000000002]
+
+    ts.mats_eval.bond = [0.0, 43.05618551913318, 40.888629416715574, 49.321970730383285, 56.158143245133338, 62.245706611484323, 68.251000923721875, 73.545464379399633, 79.032738465995692,
+                         84.188949455670524, 87.531858162376921, 91.532666285021264, 96.66808302759236, 100.23305856244875, 103.01090365681807, 103.98920712455558, 104.69444418370917, 105.09318577617957]
+
     n_dofs = ts.domain.n_dofs
 
-    tf = lambda t: 1 - np.abs(t - 1)
+#     tf = lambda t: 1 - np.abs(t - 1)
 
     ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=3.0)]
+                  BCDof(var='u', dof=n_dofs - 1, value=6.0)]
 
-    w_arr, pf_arr = np.loadtxt('D:\\1.txt')
-#     w_arr, pf_arr = np.loadtxt('D:\\1.txt', delimiter=',').T
+    tl = TLoop(ts=ts)
 
-    intep = interp1d(w_arr, pf_arr)
+    U_record, F_record = tl.eval()
+    n_dof = 2 * ts.domain.n_active_elems + 1
+#     x, y = np.loadtxt('D:\\1.txt')
+#     plt.plot(x, y)
+    plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+             marker='.', label='numerical')
 
-    w_arr = np.linspace(0, 3.0, 101)
+    fpath = 'D:\\no15.csv'
+    x, y = np.loadtxt(fpath,  delimiter=',').T
+    plt.plot(x / 2, y * 1000)
 
-    pf_arr = intep(w_arr)
+#     fpath = 'D:\\data\\pull_out\\all\\DPO-40cm-0-3300SBR-V3_R3_f.asc'
+#     x, y = np.loadtxt(fpath,  delimiter=';')
+#     plt.plot(x / 2., y * 1000., 'k--', label='experimental')
 
-    tl = TLoop(ts=ts, w_arr=w_arr, pf_arr=pf_arr)
-
-    slip, bond = tl.eval()
-
-    plt.plot(slip, bond, label='solved')
-    x = np.linspace(0., 3.0, 1000)
-    y = np.zeros_like(x)
-    y[x < 1.05] = 0.1 * x[x < 1.05] - 0.05 * x[x < 1.05] ** 2
-    y[x > 1.05] = 0.1 * 1.05 - 0.05 * \
-        1.05 ** 2 - 0.005 * (x[x > 1.05] - 1.05)
-
-#     y[x < 1.01] = 1. * x[x < 1.01] - 0.5 * x[x < 1.01] ** 2
-#     y[x > 1.01] = 1. * 1.01 - 0.5 * \
-#         1.01 ** 2 - 0.01 * (x[x > 1.01] - 1.01)
+#     fpath = 'D:\\data\\pull_out\\all\\DPO-40cm-0-3300SBR-V2_R3_f.asc'
+#     x, y = np.loadtxt(fpath,  delimiter=';')
+#     plt.plot(x / 2., y * 1000., 'k--')
 #
-    plt.plot(x, y, 'k--', label='original')
-    plt.xlabel('slip')
-    plt.ylabel('bond')
-    plt.legend()
+#     fpath = 'D:\\data\\pull_out\\all\\DPO-40cm-0-3300SBR-V3_R3_f.asc'
+#     x, y = np.loadtxt(fpath,  delimiter=';')
+#     plt.plot(x / 2., y * 1000., 'k--')
+
+    plt.xlabel('displacement [mm]')
+    plt.ylabel('pull-out force [N]')
+    plt.ylim(0, 20000)
+    plt.legend(loc='best')
+
     plt.show()

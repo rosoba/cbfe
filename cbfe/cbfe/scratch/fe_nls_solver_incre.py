@@ -13,6 +13,7 @@ from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+from scipy.misc import derivative
 
 
 class MATSEval(HasTraits):
@@ -30,15 +31,21 @@ class MATSEval(HasTraits):
     def get_G(self, slip):
         #         return 0.1
         #         print 'slip', slip
-        return self.a * np.maximum(10.0 - 10.0 * slip, -0.1)
+        #         return self.a * np.maximum(10.0 - 10.0 * slip, -0.1)
+        #         return 0.01 * np.maximum(10.0 - 10.0 * slip, -0.1)
+        return derivative(self.get_bond, slip, dx=1e-6)
 
     def get_bond(self, slip):
         x = slip
         y = np.zeros_like(x)
-        y[x < 1.01] = 10. * x[x < 1.01] - 5. * x[x < 1.01] ** 2
-        y[x > 1.01] = 10. * 1.01 - 5. * \
-            1.01 ** 2 - 0.5 * (x[x > 1.01] - 1.01)
-        return self.a * y
+#         y[x < 1.01] = 10. * x[x < 1.01] - 5. * x[x < 1.01] ** 2
+#         y[x > 1.01] = 10. * 1.01 - 5. * \
+#             1.01 ** 2 - 0.5 * (x[x > 1.01] - 1.01)
+#         return self.a * y
+        y[x < 1.05] = 0.1 * x[x < 1.05] - 0.05 * x[x < 1.05] ** 2
+        y[x > 1.05] = 0.1 * 1.05 - 0.05 * \
+            1.05 ** 2 - 0.005 * (x[x > 1.05] - 1.05)
+        return y
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1):
         n_e, n_ip, n_s = eps.shape
@@ -157,7 +164,7 @@ class TStepper(HasTraits):
         # Number of elements
         n_e_x = 4
         # length
-        L_x = 200.0
+        L_x = 40.0
         # Element definition
         domain = FEGrid(coord_max=(L_x,),
                         shape=(n_e_x,),
@@ -367,28 +374,26 @@ if __name__ == '__main__':
 #     tf = lambda t: 1 - np.abs(t - 1)
 
     ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=3.5)]
+                  BCDof(var='u', dof=n_dofs - 1, value=3.0)]
 
     tl = TLoop(ts=ts)
 
-    a_arr = np.random.normal(loc=1.0, scale=0.1, size=20)
+#     a_arr = np.random.normal(loc=1.0, scale=0.1, size=20)
 
     U_avg = []
     F_avg = []
 
-    for a in a_arr:
-        ts.mats_eval.a = a
-        U_record, F_record = tl.eval()
-        n_dof = 2 * ts.domain.n_active_elems + 1
-#     np.savetxt('D:\\1.txt', np.vstack((
-#         U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
+    U_record, F_record = tl.eval()
+    n_dof = 2 * ts.domain.n_active_elems + 1
+    np.savetxt('D:\\1.txt', np.vstack((
+        U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
 #     x, y = np.loadtxt('D:\\1.txt')
 #     plt.plot(x, y)
-#     plt.plot(U_record[:, n_dof], F_record[:, n_dof], marker='.')
-        U_avg.append(U_record[:, n_dof])
-        F_avg.append(F_record[:, n_dof])
-    plt.plot(np.average(U_avg, axis=0), np.average(
-        F_avg, axis=0), 'b--', label='average of 100 yarns')
+    plt.plot(U_record[:, n_dof], F_record[:, n_dof])
+#     U_avg.append(U_record[:, n_dof])
+#     F_avg.append(F_record[:, n_dof])
+#     plt.plot(np.average(U_avg, axis=0), np.average(
+#         F_avg, axis=0), 'b--', label='average of 100 yarns')
 
     plt.xlabel('displacement')
     plt.ylabel('pull-out force')

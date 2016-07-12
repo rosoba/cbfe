@@ -47,9 +47,9 @@ class MATSEval(HasTraits):
         #         g = lambda k: 1. / (1 + np.exp(-2 * k + 6.))
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
-        D[:, :, 0, 0] = self.E_m
-        D[:, :, 2, 2] = self.E_f
-        sig_trial = sig[:, :, 1]/(1-self.g(kappa)) + self.E_b * d_eps[:,:, 1]
+        D[:,:, 0, 0] = self.E_m
+        D[:,:, 2, 2] = self.E_f
+        sig_trial = sig[:,:, 1]/(1-self.g(kappa)) + self.E_b * d_eps[:,:, 1]
         xi_trial = sig_trial - q
         f_trial = abs(xi_trial) - (self.sigma_y + self.K_bar * alpha)
         elas = f_trial <= 1e-8
@@ -64,13 +64,13 @@ class MATSEval(HasTraits):
         w = self.g(kappa)
 
         sig_e = sig_trial - d_gamma * self.E_b * np.sign(xi_trial)
-        sig[:, :, 1] = (1-w)*sig_e
+        sig[:,:, 1] = (1-w)*sig_e
 
         E_p = -self.E_b / (self.E_b + self.K_bar + self.H_bar) * derivative(self.g, kappa, dx=1e-6) * sig_e \
             + (1 - w) * self.E_b * (self.K_bar + self.H_bar) / \
             (self.E_b + self.K_bar + self.H_bar)
 
-        D[:, :, 1, 1] = (1-w)*self.E_b*elas + E_p*plas
+        D[:,:, 1, 1] = (1-w)*self.E_b*elas + E_p*plas
 
         return sig, D, alpha, q, kappa
 
@@ -106,3 +106,16 @@ class MATSEval(HasTraits):
         return s_arr, sig_n_arr, sig_e_arr, w_arr
 
     n_s = Constant(3)
+
+if __name__ == '__main__':
+
+    import matplotlib.pyplot as plt
+
+    mat = MATSEval()
+
+    slip, sig_n_arr, sig_e_arr, w_arr = mat.get_bond_slip()
+    plt.plot(slip, sig_n_arr)
+    plt.plot(slip, sig_e_arr, '--')
+    plt.plot(slip, w_arr, '--')
+    plt.title('bond-slip law')
+    plt.show()

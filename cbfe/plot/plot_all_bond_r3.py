@@ -5,7 +5,7 @@ Created on 03.02.2016
 '''
 import matplotlib.pyplot as plt
 import numpy as np
-from scratch.fe_nls_solver_incre1 import MATSEval, FETS1D52ULRH, TStepper, TLoop
+from cbfe.scratch.fe_nls_solver_incre1 import MATSEval, FETS1D52ULRH, TStepper, TLoop
 from ibvpy.api import BCDof
 
 
@@ -78,32 +78,42 @@ x = np.linspace(0, 5.5, 500)
 # a = 'D:\\bondlaw4.txt'
 # np.savetxt(a, np.vstack((x, y)))
 
-plt.plot(x, np.interp(x, slip4, bond4), '--', label='20-v1_r3')
-plt.plot(x, np.interp(x, slip5, bond5), '--', label='20-v2_r3')
-# plt.plot(x, (np.interp(x, slip4, bond4) + np.interp(x, slip5, bond5)) /
-#          2., 'k', label='20-avg', marker='^', markevery=50, lw=2)
+# normalize to bond per yarn
+# bond1 = bond1 / 9.
+# bond2 = bond2 / 9.
+# bond3 = bond3 / 9.
+# bond4 = bond4 / 9.
+# bond5 = bond5 / 9.
+# bond6 = bond6 / 9.
+# bond7 = bond7 / 9.
+# bond8 = bond8 / 9.
 
-plt.plot(x, np.interp(x, slip1, bond1), '--', label='30-v1g_r3')
-plt.plot(x, np.interp(x, slip2, bond2), '--', label='30-v2_r3')
-plt.plot(x, np.interp(x, slip3, bond3), '--', label='30-v3_r3')
-# plt.plot(x, (np.interp(x, slip1, bond1) + np.interp(x, slip2, bond2) +
-# np.interp(x, slip3, bond3)) / 3., 'k', label='30-avg', marker='.',
-# markevery=50, lw=2)
+plt.plot(x, np.interp(x, slip4, bond4), 'k--', label='20-v1_r3')
+plt.plot(x, np.interp(x, slip5, bond5), 'k--', label='20-v2_r3')
+plt.plot(x, (np.interp(x, slip4, bond4) + np.interp(x, slip5, bond5)) /
+         2., 'k', label='20-avg', marker='^', markevery=50, lw=2)
 
-plt.plot(x, np.interp(x, slip6, bond6), '--', label='40-v1g_r3')
-plt.plot(x, np.interp(x, slip7, bond7), '--', label='40-v2_r3')
-plt.plot(x, np.interp(x, slip8, bond8), '--', label='40-v3_r3')
-# plt.plot(x, (np.interp(x, slip6, bond6) + np.interp(x, slip7, bond7) +
-# np.interp(x, slip8, bond8)) / 3., 'k', label='40-avg', marker='x',
-# markevery=50, lw=2)
+plt.plot(x, np.interp(x, slip1, bond1), 'g--', label='30-v1g_r3')
+plt.plot(x, np.interp(x, slip2, bond2), 'g--', label='30-v2_r3')
+plt.plot(x, np.interp(x, slip3, bond3), 'g--', label='30-v3_r3')
+plt.plot(x, (np.interp(x, slip1, bond1) + np.interp(x, slip2, bond2) +
+             np.interp(x, slip3, bond3)) / 3., 'g', label='30-avg', marker='.',
+         markevery=50, lw=2)
+
+plt.plot(x, np.interp(x, slip6, bond6), 'b--', label='40-v1g_r3')
+plt.plot(x, np.interp(x, slip7, bond7), 'b--', label='40-v2_r3')
+plt.plot(x, np.interp(x, slip8, bond8), 'b--', label='40-v3_r3')
+plt.plot(x, (np.interp(x, slip6, bond6) + np.interp(x, slip7, bond7) +
+             np.interp(x, slip8, bond8)) / 3., 'b', label='40-avg', marker='x',
+         markevery=50, lw=2)
 
 y = (np.interp(x, slip4, bond4) + np.interp(x, slip5, bond5) + np.interp(x, slip1, bond1) + np.interp(x, slip2, bond2) +
      np.interp(x, slip3, bond3) + np.interp(x, slip6, bond6) + np.interp(x, slip7, bond7) + np.interp(x, slip8, bond8)) / 8.
 plt.plot(x, y, '-r', label='avg-all', lw=2)
 
-plt.plot(x, np.interp(x, slip9, bond9), 'r', lw=2, label='20-v3_r3_unloading')
-plt.plot(x, np.interp(x, slip10, bond10), 'k',
-         lw=2, label='15-v1_r3_unloading')
+# plt.plot(x, np.interp(x, slip9, bond9), 'r', lw=2, label='20-v3_r3_unloading')
+# plt.plot(x, np.interp(x, slip10, bond10), 'k',
+#          lw=2, label='15-v1_r3_unloading')
 
 print [x[x <= 1.5]]
 print [y[x <= 1.5]]
@@ -131,7 +141,7 @@ def plt_expri(L_x, slip, bond, fpath, label, color):
     U_record, F_record = tl.eval()
     n_dof = 2 * ts.domain.n_active_elems + 1
     plt.plot(U_record[:, n_dof], F_record[:, n_dof],
-             marker='.', color='k', markevery=5)
+             color='k', markevery=5)
     d, f = np.loadtxt(fpath,  delimiter=';')
 #     plt.plot(x, np.interp(x, d / 2., f * 1000.),
 #              '--', color=color, label=label)
@@ -155,75 +165,76 @@ def plt_expri(L_x, slip, bond, fpath, label, color):
 #           'D:\\data\\pull_out\\all\\DPO-40cm-0-3300SBR-V2_R3_f.asc', '40-v2', 'b')
 # plt_expri(200., slip8, bond8,
 #           'D:\\data\\pull_out\\all\\DPO-40cm-0-3300SBR-V3_R3_f.asc', '40-v3', 'b')
-
-plt_expri(100., slip9, bond9,
-          'D:\\data\\pull_out\\all\\DPO-20cm-0-3300SBR-V3_R3_f.asc', '20-v3', 'r')
-plt_expri(75., slip10, bond10,
-          'D:\\data\\pull_out\\all\\DPO-15cm-0-3300SBR-V1_R3_f.asc', '15-v1', 'b')
-plt.plot(0, 0, marker='.', color='k', label='numerical')
-plt.legend(loc='best', ncol=2)
-plt.xlabel('displacement[mm]')
-plt.ylabel('pull-out force[N]')
-plt.ylim(0, 20000)
+#
+# plt_expri(100., slip9, bond9,
+# 'D:\\data\\pull_out\\all\\DPO-20cm-0-3300SBR-V3_R3_f.asc', '20-v3', 'r')
+# plt_expri(75., slip10, bond10,
+# 'D:\\data\\pull_out\\all\\DPO-15cm-0-3300SBR-V1_R3_f.asc', '15-v1', 'b')
+# plt.plot(0, 0, marker='.', color='k', label='numerical')
+# plt.legend(loc='best', ncol=2)
+# plt.xlabel('displacement[mm]')
+# plt.ylabel('pull-out force[N]')
+# plt.ylim(0, 20000)
 
 
 # prediction
-# tl.ts.mats_eval.slip = x.tolist()
-# tl.ts.mats_eval.bond = y.tolist()
-# plt.figure()
-# tl.ts.L_x = 250.
-# U_record, F_record = tl.eval()
-# n_dof = 2 * ts.domain.n_active_elems + 1
-# plt.plot(U_record[:, n_dof], F_record[:, n_dof],
-#          marker='.', color='k', markevery=5, label='predicted')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-50cm-0-3300SBR-V1g_R3_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v1')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-50cm-0-3300SBR-V3_R3_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v3')
-# plt.legend(loc='best', ncol=2)
-# plt.xlabel('displacement[mm]')
-# plt.ylabel('pull-out force[kN]')
-# plt.ylim(0,)
-#
-# plt.figure()
-# tl.ts.L_x = 300.
-# U_record, F_record = tl.eval()
-# n_dof = 2 * ts.domain.n_active_elems + 1
-# plt.plot(U_record[:, n_dof], F_record[:, n_dof],
-#          marker='.', color='k', label='predicted', markevery=5)
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-60cm-0-3300SBR-V1g_R3_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v1g')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-60cm-0-3300SBR-V2_R3_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v2')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-60cm-0-3300SBR-V3_R3_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v3')
-# plt.legend(loc='best', ncol=2)
-# plt.xlabel('displacement[mm]')
-# plt.ylabel('pull-out force[kN]')
-# plt.ylim(0,)
-#
-#
-# plt.figure()
-# tl.ts.L_x = 350.
-# U_record, F_record = tl.eval()
-# n_dof = 2 * ts.domain.n_active_elems + 1
-# plt.plot(U_record[:, n_dof], F_record[:, n_dof],
-#          marker='.', color='k', label='predicted', markevery=5)
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-70cm-0-3300SBR-V1g_R3_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v1g')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-70cm-0-3300SBR-V2_R3_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v2')
-# plt.legend(loc='best', ncol=2)
-# plt.xlabel('displacement[mm]')
-# plt.ylabel('pull-out force[kN]')
-# plt.ylim(0,)
+
+tl.ts.mats_eval.slip = x.tolist()
+tl.ts.mats_eval.bond = y.tolist()
+plt.figure()
+tl.ts.L_x = 250.
+U_record, F_record = tl.eval()
+n_dof = 2 * ts.domain.n_active_elems + 1
+plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+         marker='.', color='k', markevery=5, label='predicted')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-50cm-0-3300SBR-V1g_R3_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v1')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-50cm-0-3300SBR-V3_R3_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v3')
+plt.legend(loc='best', ncol=2)
+plt.xlabel('displacement[mm]')
+plt.ylabel('pull-out force[kN]')
+plt.ylim(0,)
+
+plt.figure()
+tl.ts.L_x = 300.
+U_record, F_record = tl.eval()
+n_dof = 2 * ts.domain.n_active_elems + 1
+plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+         marker='.', color='k', label='predicted', markevery=5)
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-60cm-0-3300SBR-V1g_R3_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v1g')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-60cm-0-3300SBR-V2_R3_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v2')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-60cm-0-3300SBR-V3_R3_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v3')
+plt.legend(loc='best', ncol=2)
+plt.xlabel('displacement[mm]')
+plt.ylabel('pull-out force[kN]')
+plt.ylim(0,)
+
+
+plt.figure()
+tl.ts.L_x = 350.
+U_record, F_record = tl.eval()
+n_dof = 2 * ts.domain.n_active_elems + 1
+plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+         marker='.', color='k', label='predicted', markevery=5)
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-70cm-0-3300SBR-V1g_R3_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v1g')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-70cm-0-3300SBR-V2_R3_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v2')
+plt.legend(loc='best', ncol=2)
+plt.xlabel('displacement[mm]')
+plt.ylabel('pull-out force[kN]')
+plt.ylim(0,)
 #
 #
 # plt.figure()

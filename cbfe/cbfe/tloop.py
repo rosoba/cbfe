@@ -67,6 +67,7 @@ class TLoop(HasTraits):
                     step_flag, U_k, d_U_k, eps, sig, t_n, t_n1, alpha, q, kappa)
 
                 F_ext = -R
+                print F_ext
                 K.apply_constraints(R)
 #                 print 'r', np.linalg.norm(R)
                 d_U_k = K.solve()
@@ -101,7 +102,7 @@ if __name__ == '__main__':
 # BCDof(var='u', dof=n_dofs - 1, value=2.5, time_function=tf)]
 
     ts.bc_list = [BCDof(var='u', dof=0, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=10.0)]
+                  BCDof(var='u', dof=n_dofs - 1, value=10.)]
 
     tl = TLoop(ts=ts)
 
@@ -110,8 +111,8 @@ if __name__ == '__main__':
     n_dof = 2 * ts.domain.n_active_elems + 1
 #     print U_record[:, n_dof]
 #     print F_record[:, n_dof]
-    plt.plot(U_record[:, n_dof] * 2, F_record[:, n_dof] / 1000, marker='.')
-    plt.ylim(0, 35)
+    plt.plot(U_record[:, n_dof] * 2, F_record[:, n_dof] / 1000., marker='.')
+#     plt.ylim(0, 35)
     plt.xlabel('displacement')
     plt.ylabel('force')
     plt.show()

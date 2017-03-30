@@ -62,7 +62,7 @@ def plt_expri(L_x, slip, bond, fpath, label, color):
     tl.ts.L_x = L_x
     tl.ts.mats_eval.slip = slip.tolist()
     tl.ts.mats_eval.bond = bond.tolist()
-    U_record, F_record = tl.eval()
+    U_record, F_record, tau = tl.eval()
     n_dof = 2 * ts.domain.n_active_elems + 1
     plt.plot(U_record[:, n_dof], F_record[:, n_dof],
              marker='.', color='k', markevery=5)

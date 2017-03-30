@@ -92,3 +92,7 @@ class FETS1D52ULRH(FETSEval):
         Return the derivatives of the shape functions
         '''
         return self.get_dNr_geo_mtx(r_pnt)
+
+if __name__ == '__main__':
+
+    print FETS1D52ULRH().ip_weights

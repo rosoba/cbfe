@@ -67,7 +67,7 @@ class TStepper(HasTraits):
         # [ d, n ]
         geo_r = fets_eval.geo_r.T
         # [ d, n, i ]
-        dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
+        dNr_geo = geo_r[:,:, None] * np.array([1, 1]) * 0.5
         # [ i, n, d ]
         dNr_geo = np.einsum('dni->ind', dNr_geo)
         # [ n_e, n_geo_r, n_dim_geo ]
@@ -105,17 +105,13 @@ class TStepper(HasTraits):
         r_ip = fets_eval.ip_coords[:, :-2].T
         # [ d, n ]
         geo_r = fets_eval.geo_r.T
-        # [ d, n, i ]
-        dNr_geo = geo_r[:, :, None] * np.array([1, 1]) * 0.5
-        # [ i, n, d ]
-        dNr_geo = np.einsum('dni->ind', dNr_geo)
 
         J_inv = np.linalg.inv(self.J_mtx)
 
         # shape function for the unknowns
         # [ d, n, i]
-        Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None,:])
-        dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
+        Nr = 0.5 * (1. + geo_r[:,:, None] * r_ip[None,:])
+        dNr = 0.5 * geo_r[:,:, None] * np.array([1, 1])
 
         # [ i, n, d ]
         Nr = np.einsum('dni->ind', Nr)
@@ -128,10 +124,9 @@ class TStepper(HasTraits):
         B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
         B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
         B_factors = np.array([-1, 1], dtype='float_')
-        B[:, :,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
-                                              Nx[:, :, N_idx])
-        B[:, :,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
-
+        B[:,:,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
+                                              Nx[:,:, N_idx])
+        B[:,:,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
         return B
 
     def apply_essential_bc(self):

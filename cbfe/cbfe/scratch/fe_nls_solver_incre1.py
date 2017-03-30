@@ -1,5 +1,5 @@
-from envisage.ui.workbench.api import WorkbenchApplication
-from mayavi.sources.api import VTKDataSource, VTKFileReader
+# from envisage.ui.workbench.api import WorkbenchApplication
+# from mayavi.sources.api import VTKDataSource, VTKFileReader
 from traits.api import implements, Int, Array, HasTraits, Instance, \
     Property, cached_property, Constant, Float, List
 from ibvpy.api import BCDof
@@ -16,28 +16,30 @@ from scipy.interpolate import interp1d
 
 class MATSEval(HasTraits):
 
-    E_m = Float(28484, tooltip='Stiffness of the matrix',
+    E_m = Float(28484., tooltip='Stiffness of the matrix',
                 auto_set=False, enter_set=False)
 
-    E_f = Float(170000, tooltip='Stiffness of the fiber',
+    E_f = Float(170000., tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
     slip = List
     bond = List
 
     def b_s_law(self, x):
-        return np.interp(x, self.slip, self.bond)
+        return np.sign(x) * np.interp(np.abs(x), self.slip, self.bond)
 
     def G(self, x):
         d = np.diff(self.bond) / np.diff(self.slip)
         d = np.append(d, d[-1])
-        G = interp1d(np.array(self.slip), d, kind='zero')
-        y = np.zeros_like(x)
-        y[x < self.slip[0]] = d[0]
-        y[x > self.slip[-1]] = d[-1]
-        x[x < self.slip[0]] = self.slip[-1] + 10000.
-        y[x <= self.slip[-1]] = G(x[x <= self.slip[-1]])
-        return y
+        G = interp1d(
+            np.array(self.slip), d, kind='zero', fill_value=(0, 0), bounds_error=False)
+#         y = np.zeros_like(x)
+#         y[x < self.slip[0]] = d[0]
+#         y[x > self.slip[-1]] = d[-1]
+#         x[x < self.slip[0]] = self.slip[-1] + 10000.
+#         y[x <= self.slip[-1]] = G(x[x <= self.slip[-1]])
+#         return np.sign(x) * y
+        return G(np.abs(x))
 
     n_e_x = Float
 
@@ -45,26 +47,12 @@ class MATSEval(HasTraits):
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
         D[:, :, 0, 0] = self.E_m
-#         D[:,:, 2, 2] = self.E_f * (eps[:,:, 2] > 1e-4) + 0.01 * self.E_f * (eps[:,:, 2] <= 1e-4)
         D[:, :, 2, 2] = self.E_f
         D[:, :, 1, 1] = self.G(eps[:,:, 1])
 
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
         sig[:, :, 1] = self.b_s_law(eps[:,:, 1])
-
-        # the effect of knot
-        k = 43000 * 2
-        for i in np.arange(10, self.n_e_x, 20):
-            #         for i in [10]:
-            D[i - 1, 1, 1, 1] += k * \
-                (eps[i - 1, 1, 1] < 0.105) * (eps[i - 1, 1, 1] >= 0.1)
-            D[i, 0, 1, 1] += k * (eps[i, 0, 1] < 0.105) * (eps[i, 0, 1] >= 0.1)
-
-            sig[i - 1, 1, 1] += k * (eps[i - 1, 1, 1] - 0.1) * \
-                (eps[9, 1, 1] < 0.105) * (eps[i - 1, 1, 1] >= 0.1)
-            sig[i, 0, 1] += k * (eps[i, 0, 1] - 0.1) * \
-                (eps[i, 0, 1] < 0.105) * (eps[i, 0, 1] >= 0.1)
 
         return sig, D
 
@@ -81,8 +69,8 @@ class FETS1D52ULRH(FETSEval):
 
     debug_on = True
 
-    A_m = Float(120 * 13 - 9 * 1.85, desc='matrix area [mm2]')
-    A_f = Float(9 * 1.85, desc='reinforcement area [mm2]')
+    A_m = Float(120. * 13. - 9. * 1.85, desc='matrix area [mm2]')
+    A_f = Float(9. * 1.85, desc='reinforcement area [mm2]')
     L_b = Float(1., desc='perimeter of the bond interface [mm]')
 
     # Dimensional mapping
@@ -334,7 +322,7 @@ class TStepper(HasTraits):
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    d_t = Float(0.02)
+    d_t = Float(0.01)
     t_max = Float(1.0)
     k_max = Int(200)
     tolerance = Float(1e-6)
@@ -355,6 +343,8 @@ class TLoop(HasTraits):
         eps = np.zeros((n_e, n_ip, n_s))
         sig = np.zeros((n_e, n_ip, n_s))
 
+        sf_record = np.zeros(2 * n_e)
+
         while t_n1 <= self.t_max:
             t_n1 = t_n + self.d_t
             print t_n1
@@ -374,6 +364,7 @@ class TLoop(HasTraits):
                     F_record = np.vstack((F_record, F_ext))
                     U_k += d_U
                     U_record = np.vstack((U_record, U_k))
+                    sf_record = np.vstack((sf_record, sig[:, :, 1].flatten()))
                     break
                 k += 1
                 if k == self.k_max:
@@ -381,7 +372,7 @@ class TLoop(HasTraits):
                 step_flag = 'corrector'
 
             t_n = t_n1
-        return U_record, F_record
+        return U_record, F_record, sf_record
 
 if __name__ == '__main__':
 

@@ -97,9 +97,16 @@ plt.plot(x, np.interp(x, slip9, bond9), 'b--', label='30-v3_r4')
 plt.plot(x, (np.interp(x, slip7, bond7) + np.interp(x, slip8, bond8) + np.interp(x, slip9, bond9)) /
          3., 'b', label='30-avg', marker='.', markevery=50, lw=2)
 
+x = np.linspace(0, 2, 21)
 y = (np.interp(x, slip4, bond4) + np.interp(x, slip5, bond5) + np.interp(x, slip9, bond9) + np.interp(x, slip2, bond2) +
      np.interp(x, slip3, bond3) + np.interp(x, slip6, bond6) + np.interp(x, slip7, bond7) + np.interp(x, slip8, bond8)) / 8.
 plt.plot(x, y, '-r', label='avg-all', lw=2)
+
+print [x]
+print [y]
+print fsfsdfsf
+
+
 #
 # plt.plot(x, np.interp(x, slip9, bond9), 'r', lw=2, label='20-v3_r3_unloading')
 # plt.plot(x, np.interp(x, slip10, bond10), 'k',

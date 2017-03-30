@@ -38,10 +38,6 @@ class MATSEval(HasTraits):
     def get_bond(self, slip):
         x = slip
         y = np.zeros_like(x)
-#         y[x < 1.01] = 10. * x[x < 1.01] - 5. * x[x < 1.01] ** 2
-#         y[x > 1.01] = 10. * 1.01 - 5. * \
-#             1.01 ** 2 - 0.5 * (x[x > 1.01] - 1.01)
-#         return self.a * y
         y[x < 1.05] = 0.1 * x[x < 1.05] - 0.05 * x[x < 1.05] ** 2
         y[x > 1.05] = 0.1 * 1.05 - 0.05 * \
             1.05 ** 2 - 0.005 * (x[x > 1.05] - 1.05)
@@ -142,6 +138,8 @@ class TStepper(HasTraits):
     '''Time stepper object for non-linear Newton-Raphson solver.
     '''
 
+    L_x = 40.  # length
+
     mats_eval = Property(Instance(MATSEval))
     '''Finite element formulation object.
     '''
@@ -162,11 +160,9 @@ class TStepper(HasTraits):
     @cached_property
     def _get_domain(self):
         # Number of elements
-        n_e_x = 4
-        # length
-        L_x = 40.0
+        n_e_x = 20
         # Element definition
-        domain = FEGrid(coord_max=(L_x,),
+        domain = FEGrid(coord_max=(self.L_x,),
                         shape=(n_e_x,),
                         fets_eval=self.fets_eval)
         return domain
@@ -366,35 +362,36 @@ if __name__ == '__main__':
     # nonlinear solver
     #=========================================================================
     # initialization
+    for L in [10, 20, 40, 80, 160, 320]:
 
-    ts = TStepper()
+        ts = TStepper(L_x=L)
 
-    n_dofs = ts.domain.n_dofs
+        n_dofs = ts.domain.n_dofs
 
 #     tf = lambda t: 1 - np.abs(t - 1)
 
-    ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=3.0)]
+        ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
+                      BCDof(var='u', dof=n_dofs - 1, value=3.0)]
 
-    tl = TLoop(ts=ts)
+        tl = TLoop(ts=ts)
 
 #     a_arr = np.random.normal(loc=1.0, scale=0.1, size=20)
 
-    U_avg = []
-    F_avg = []
+        U_avg = []
+        F_avg = []
 
-    U_record, F_record = tl.eval()
-    n_dof = 2 * ts.domain.n_active_elems + 1
-    np.savetxt('D:\\1.txt', np.vstack((
-        U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
+        U_record, F_record = tl.eval()
+        n_dof = 2 * ts.domain.n_active_elems + 1
+#     np.savetxt('D:\\1.txt', np.vstack((
+#         U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
 #     x, y = np.loadtxt('D:\\1.txt')
 #     plt.plot(x, y)
-    plt.plot(U_record[:, n_dof], F_record[:, n_dof])
+        plt.plot(U_record[:, n_dof], F_record[:, n_dof], label=str(L))
 #     U_avg.append(U_record[:, n_dof])
 #     F_avg.append(F_record[:, n_dof])
 #     plt.plot(np.average(U_avg, axis=0), np.average(
 #         F_avg, axis=0), 'b--', label='average of 100 yarns')
-
+    plt.legend(loc='best')
     plt.xlabel('displacement')
     plt.ylabel('pull-out force')
     plt.show()

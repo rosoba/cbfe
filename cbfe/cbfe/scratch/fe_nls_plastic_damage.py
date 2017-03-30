@@ -45,9 +45,9 @@ class MATSEval(HasTraits):
     # bond damage law
     alpha = Float(1.0)
     beta = Float(1.0)
-#     g = lambda self, k: 1. / (1 + np.exp(-self.alpha * k + 6.)) * self.beta
-    g = lambda self, k: 0.
-    np.random
+    g = lambda self, k: 1. / (1 + np.exp(-self.alpha * k + 6.)) * self.beta
+#     g = lambda self, k: 0.
+#     np.random
 
     # nonlinear hardening law
 #     A = lambda self, a: self.E_b * (a - 0.2 * a ** 2)

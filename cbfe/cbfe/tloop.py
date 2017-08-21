@@ -103,7 +103,7 @@ if __name__ == '__main__':
 # BCDof(var='u', dof=n_dofs - 1, value=2.5, time_function=tf)]
 
     ts.bc_list = [BCDof(var='u', dof=0, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=5)]
+                  BCDof(var='f', dof=n_dofs - 1, value=0.5)]
 
     tl = TLoop(ts=ts, d_t=0.01)
 

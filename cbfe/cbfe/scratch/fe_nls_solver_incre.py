@@ -18,10 +18,10 @@ from scipy.misc import derivative
 
 class MATSEval(HasTraits):
 
-    E_m = Float(10, tooltip='Stiffness of the matrix',
+    E_m = Float(28284, tooltip='Stiffness of the matrix',
                 auto_set=False, enter_set=False)
 
-    E_f = Float(10, tooltip='Stiffness of the fiber',
+    E_f = Float(170000, tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
 #     G = Float(0.1, tooltip='Bond stiffness')
@@ -362,31 +362,33 @@ if __name__ == '__main__':
     # nonlinear solver
     #=========================================================================
     # initialization
-    for L in [10, 20, 40, 80, 160, 320]:
+    #     for L in [10, 20, 40, 80, 160, 320]:
 
-        ts = TStepper(L_x=L)
+    L = 700.
 
-        n_dofs = ts.domain.n_dofs
+    ts = TStepper(L_x=L)
+
+    n_dofs = ts.domain.n_dofs
 
 #     tf = lambda t: 1 - np.abs(t - 1)
 
-        ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
-                      BCDof(var='u', dof=n_dofs - 1, value=3.0)]
+    ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
+                  BCDof(var='u', dof=n_dofs - 1, value=3.0)]
 
-        tl = TLoop(ts=ts)
+    tl = TLoop(ts=ts)
 
 #     a_arr = np.random.normal(loc=1.0, scale=0.1, size=20)
 
-        U_avg = []
-        F_avg = []
+    U_avg = []
+    F_avg = []
 
-        U_record, F_record = tl.eval()
-        n_dof = 2 * ts.domain.n_active_elems + 1
+    U_record, F_record = tl.eval()
+    n_dof = 2 * ts.domain.n_active_elems + 1
 #     np.savetxt('D:\\1.txt', np.vstack((
 #         U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
 #     x, y = np.loadtxt('D:\\1.txt')
 #     plt.plot(x, y)
-        plt.plot(U_record[:, n_dof], F_record[:, n_dof], label=str(L))
+    plt.plot(U_record[:, n_dof], F_record[:, n_dof], label=str(L))
 #     U_avg.append(U_record[:, n_dof])
 #     F_avg.append(F_record[:, n_dof])
 #     plt.plot(np.average(U_avg, axis=0), np.average(

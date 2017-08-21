@@ -70,7 +70,7 @@ bond10 = np.array([0.0, 43.05618551913318, 40.888629416715574, 49.32197073038328
                    84.188949455670524, 87.531858162376921, 91.532666285021264, 96.66808302759236, 100.23305856244875, 103.01090365681807, 103.98920712455558, 104.69444418370917, 105.09318577617957])
 
 
-x = np.linspace(0, 5.5, 500)
+x = np.linspace(0, 5.5, 30)
 
 # y = (np.interp(x, slip2, bond2) + np.interp(x, slip3, bond3) +
 #      np.interp(x, slip4, bond4) + np.interp(x, slip5, bond5)) / 4.
@@ -115,8 +115,8 @@ plt.plot(x, y, '-r', label='avg-all', lw=2)
 # plt.plot(x, np.interp(x, slip10, bond10), 'k',
 #          lw=2, label='15-v1_r3_unloading')
 
-print [x[x <= 1.5]]
-print [y[x <= 1.5]]
+print [x]
+print [y]
 
 plt.xlabel('slip [mm]')
 plt.ylabel('bond [N/mm]')

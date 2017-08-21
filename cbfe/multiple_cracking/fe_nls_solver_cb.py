@@ -20,6 +20,64 @@ class MATSEval(HasTraits):
     E_f = Float(170000., tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
+    slack = 0.002
+
+#     def reinf_law(self, eps_f):
+#         return 1. * eps_f * (eps_f < self.slack) + (self.E_f * (eps_f - self.slack) + 0.002) * (eps_f >= self.slack)
+#
+#     def E_reinf(self, eps_f):
+#         return 1. * (eps_f < self.slack) + self.E_f * (eps_f >= self.slack)
+
+#     reinf_law_x = np.array([0.,  0.00041667,  0.00083333,  0.00125,  0.00166667,
+#                             0.00208333,  0.0025,  0.00291667,  0.00333333,  0.00375,
+#                             0.00416667,  0.00458333,  0.005,  0.00541667,  0.00583333,
+#                             0.00625,  0.00666667,  0.00708333,  0.0075,  0.00791667,
+#                             0.00833333,  0.00875,  0.00916667,  0.00958333,  0.01, 10])
+#     reinf_law_y = np.array([0.,    30.25137058,    60.50274116,    90.75411175,
+#                             121.00548233,   151.25685291,   180.78967788,   213.84723224,
+#                             254.26299789,   301.27136355,   353.11307389,   409.66935019,
+#                             469.9029913,   533.34632707,   597.82635842,   666.09922046,
+#                             738.02173445,   811.21614618,   884.57900091,   961.54921197,
+#                             1038.34892872,  1116.13154294,  1195.10676351,  1275.96327356,
+#                             1351.38206049, 1351.38206049 + 170000. * 9.99])
+#
+#     def reinf_law(self, x):
+#         return np.sign(x) * np.interp(np.abs(x), self.reinf_law_x, self.reinf_law_y)
+#
+#     def E_reinf(self, x):
+#         d = np.diff(self.reinf_law_y) / np.diff(self.reinf_law_x)
+#         d = np.append(d, d[-1])
+#         E = interp1d(
+#             self.reinf_law_x, d, kind='zero', fill_value=(0, 0), bounds_error=False)
+#
+#         print x
+#         print E(np.abs(x))
+#
+#         print dsfs
+#
+#         return E(np.abs(x))
+
+    a = 53472222.2222
+    b = 10352083.3333
+    k = 40000.
+
+#     def reinf_law(self, x):
+#         a = self.a * x ** 3 + self.b * x ** 2 + self.k * x
+#         b = self.a * 0.006 ** 3 + self.b * \
+#             0.006 ** 2 + self.k * 0.006 + 170000. * (x - 0.006)
+#         return a * (x < 0.006) + b * (x >= 0.006)
+#
+#     def E_reinf(self, x):
+#         a = 3. * self.a * x ** 2 + 2. * self.b * x + self.k
+#         b = 170000.
+#         return a * (x < 0.006) + b * (x >= 0.006)
+
+    def reinf_law(self, x):
+        return self.E_f * x
+
+    def E_reinf(self, x):
+        return self.E_f * np.ones_like(x)
+
     slip = List
     bond = List
 
@@ -45,12 +103,13 @@ class MATSEval(HasTraits):
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
         D[:, :, 0, 0] = self.E_m
-        D[:, :, 2, 2] = self.E_f
         D[:, :, 1, 1] = self.G(eps[:,:, 1])
+        D[:, :, 2, 2] = self.E_reinf(eps[:,:, 2])
 
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
         sig[:, :, 1] = self.b_s_law(eps[:,:, 1])
+        sig[:, :, 2] = self.reinf_law(eps[:,:, 2])
 
         return sig, D
 
@@ -313,7 +372,7 @@ class TLoop(HasTraits):
     d_t = Float(0.01)
     t_max = Float(1.0)
     k_max = Int(200)
-    tolerance = Float(1e-4)
+    tolerance = Float(1e-6)
 
     def eval(self):
 
@@ -333,7 +392,7 @@ class TLoop(HasTraits):
 
         sf_record = np.zeros(2 * n_e)  # shear flow
 
-        sig_f_record = np.zeros(2 * n_e)
+        eps_f_record = np.zeros(2 * n_e)
         sig_m_record = np.zeros(2 * n_e)
 
         while t_n1 <= self.t_max:
@@ -357,17 +416,16 @@ class TLoop(HasTraits):
                     sf_record = np.vstack((sf_record, sig[:, :, 1].flatten()))
 
                     sig_m_record = np.vstack((sig_m_record, sig[:, :, 0].flatten()))
-                    sig_f_record = np.vstack((sig_f_record, sig[:, :, 2].flatten()))
+                    eps_f_record = np.vstack((eps_f_record, eps[:, :, 2].flatten()))
 
                     break
                 k += 1
                 if k == self.k_max:
-                    print self.ts.mats_eval.bond
                     print 'nonconvergence'
                 step_flag = 'corrector'
 
             t_n = t_n1
-        return U_record, F_record, sf_record, sig_m_record, sig_f_record
+        return U_record, F_record, sf_record, sig_m_record, eps_f_record
 
 if __name__ == '__main__':
 
@@ -378,7 +436,7 @@ if __name__ == '__main__':
 
     ts = TStepper()
 
-    ts.L_x = 1
+    ts.L_x = 200
 
     ts.n_e_x = 20
 
@@ -391,7 +449,7 @@ if __name__ == '__main__':
 # 103.98920712455558, 104.69444418370917, 105.09318577617957]
 
     ts.mats_eval.slip = [0, 0.1, 0.2, 0.3, 0.4, 0.5]
-    ts.mats_eval.bond = [0., 10., 30., 35., 20., 10.]
+    ts.mats_eval.bond = [0., 10., 20., 30., 40., 50.]
 
     n_dofs = ts.domain.n_dofs
 
@@ -401,23 +459,17 @@ if __name__ == '__main__':
                   BCDof(var='u', dof=n_dofs - 1, value=0.5)]
 
     tl = TLoop(ts=ts)
-#
+
+    U_record, F_record, sf_record, sig_m_record, sig_f_record = tl.eval()
+    n_dof = 2 * ts.domain.n_active_elems + 1
+    plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+             marker='.', label='numerical')
+
+#     ts.L_x = 200
 #     U_record, F_record, sf_record, sig_m_record, sig_f_record = tl.eval()
 #     n_dof = 2 * ts.domain.n_active_elems + 1
 #     plt.plot(U_record[:, n_dof], F_record[:, n_dof],
 #              marker='.', label='numerical')
-
-    ts.L_x = 200
-    U_record, F_record, sf_record, sig_m_record, sig_f_record = tl.eval()
-    n_dof = 2 * ts.domain.n_active_elems + 1
-    plt.plot(U_record[:, n_dof], F_record[:, n_dof], label='loaded')
-    plt.plot(U_record[:, 1], F_record[:, n_dof], label='free')
-
-    np.savetxt('D:\\loaded.txt', np.vstack((
-        U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
-
-    np.savetxt('D:\\free.txt',  np.vstack((
-        U_record[:, 1], F_record[:, n_dofs - 1])))
 
     plt.xlabel('displacement [mm]')
     plt.ylabel('pull-out force [N]')

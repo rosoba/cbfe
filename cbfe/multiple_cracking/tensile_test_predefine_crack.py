@@ -24,6 +24,8 @@ class CompositeTensileTest(HasTraits):
     L = Float(1000.)  # the specimen length - mm
     x = Property(depends_on='n_x, L')  # coordinates of the material points
 
+    cs = Float(18.)  # predefined crack spacing
+
     @cached_property
     def _get_x(self):
         return np.linspace(0, self.L, self.n_x)
@@ -109,14 +111,23 @@ class CompositeTensileTest(HasTraits):
         BC_x_lst = [self.BC_x]
         sig_c_lst = [0.]  # record cracking load factor
 
-        # the first crack initiates at the point of lowest matrix strength
-        idx_0 = np.argmin(self.sig_mu_x)
-        self.y.append(self.x[idx_0])
-        sig_c_0 = self.sig_mu_x[idx_0] * self.cb.E_c / self.cb.E_m
-        sig_c_lst.append(sig_c_0)
-        print self.sig_mu_x[idx_0], self.x[idx_0]
-        z_x_lst.append(np.array(self.z_x))
-        BC_x_lst.append(np.array(self.BC_x))
+        # min matrix strength
+        np.amin(self.sig_mu_x)
+        sig_c_0 = np.amin(self.sig_mu_x) * self.cb.E_c / self.cb.E_m
+
+        # introduce the predefined cracks
+        cracks = self.cs * np.arange(self.L / self.cs + 1)
+        d = np.abs(self.x[:, None] - cracks[None, :])
+        min_idx = np.argmin(d, axis=0)
+        crack_postion = self.x[min_idx]
+
+        for i, crack in enumerate(crack_postion):
+            self.y.append(crack)
+            # add a small number to the min matrix strength to avoid numerical
+            # problems
+            sig_c_lst.append(sig_c_0 + i * 1e-8)
+            z_x_lst.append(np.array(self.z_x))
+            BC_x_lst.append(np.array(self.BC_x))
 
         # determine the following cracking load factors
         while True:
@@ -185,7 +196,7 @@ class CompositeTensileTest(HasTraits):
                     self.get_eps_f_x(load, z_x, BC_x), self.x) / self.L
                 sig_m = self.get_sig_m_x(load, z_x, BC_x)
             # save the cracking history
-            save = False
+            save = True
             if save:
                 plt.plot(self.x, sig_m)
                 plt.plot(self.x, self.sig_mu_x)
@@ -196,47 +207,6 @@ class CompositeTensileTest(HasTraits):
                 plt.clf()
 
         return eps_arr
-
-    def get_crack_opening(self, z_x, BC_x, load):
-        '''evaluate the crack openings for gving load(single)'''
-        eps_f_x = self.get_eps_f_x(load, z_x, BC_x)
-        eps_m_x = self.get_sig_m_x(load, z_x, BC_x) / self.cb.E_m
-        y = self.x[z_x == 0]
-        distance = np.abs(self.x[:, np.newaxis] - y[np.newaxis, :])
-        nearest_crack = y[np.argmin(distance, axis=1)]
-        w_arr = np.array([np.trapz((eps_f_x[nearest_crack == y_i] -
-                                    eps_m_x[nearest_crack == y_i]),
-                                   self.x[nearest_crack == y_i])
-                          for y_i in y])
-        return w_arr
-
-    def get_w_dist(self, sig_c_i, z_x_i, BC_x_i, load_arr):
-        '''function for evaluate the crack width
-        '''
-        w_dist = []
-        for sig_c in load_arr:
-            idx = np.searchsorted(sig_c_i, sig_c) - 1
-            z_x = z_x_i[idx]
-            if np.any(z_x == 2 * self.L):
-                w_arr = np.array([np.nan])
-            else:
-                BC_x = BC_x_i[idx]
-                eps_f_x = self.get_eps_f_x(sig_c, z_x, BC_x)
-                eps_m_x = self.get_sig_m_x(
-                    sig_c, z_x, BC_x) / self.cb.E_m
-                y = self.x[z_x == 0]
-                if not y.size:
-                    continue
-                distance = np.abs(self.x[:, np.newaxis] - y[np.newaxis, :])
-                nearest_crack = y[np.argmin(distance, axis=1)]
-                w_arr = np.array([np.trapz((eps_f_x[nearest_crack == y_i] -
-                                            eps_m_x[nearest_crack == y_i]),
-                                           self.x[nearest_crack == y_i])
-                                  for y_i in y])
-            w_dist.append(w_arr)
-
-        return w_dist
-
 
 if __name__ == '__main__':
 

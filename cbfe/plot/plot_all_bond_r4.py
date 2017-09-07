@@ -384,16 +384,26 @@ def predict_max(L_x, slip, bond):
     tl.ts.mats_eval.bond = bond.tolist()
     U_record, F_record, sf_record = tl.eval()
     n_dof = 2 * ts.domain.n_active_elems + 1
-    return np.amax(F_record[:, n_dof])
+    max_F_idx = np.argmax(F_record[:, n_dof])
+    print max_F_idx
+    U = np.reshape(U_record[max_F_idx, :], (-1, 2)).T
+    slip = U[1] - U[0]
+    return F_record[:, n_dof][max_F_idx], slip[0], slip[-1]
+
 L_arr = np.arange(10, 410, 50)
 dpo_max = []
+slip_left = []
+slip_right = []
 lorenz_max = []
 for L in L_arr:
-    dpo_max.append(predict_max(L, x, y))
-    lorenz_max.append(predict_max(L, x, lorenz_avg))
+    F_max, sl, sr = predict_max(L, x, y)
+    dpo_max.append(F_max)
+    slip_left.append(sl)
+    slip_right.append(sr)
+#     lorenz_max.append(predict_max(L, x, lorenz_avg))
 fig = figure.add_subplot(111)
 fig.plot(L_arr, np.array(dpo_max) / 1.83, label='DPO')
-fig.plot(L_arr, np.array(lorenz_max) / 1.83, label='Lorenz')
+# fig.plot(L_arr, np.array(lorenz_max) / 1.83, label='Lorenz')
 fig.set_ylim(0, )
 fig.set_xlim(0, )
 fig.set_xlabel('anchorage length [mm]')
@@ -408,10 +418,18 @@ plt.plot(length_arr, max_force_arr * 1000 / 9. / 1.83, 'k.')
 
 y1, y2 = fig.get_ylim()
 
+# ax2 = fig.twinx()
+# ax2.set_ylim(0, y2 * 1.83)
+# ax2.set_yticks(np.arange(0, y2 * 1.83, 500))
+# ax2.set_ylabel('Force per yarn [N]')
+
 ax2 = fig.twinx()
-ax2.set_ylim(0, y2 * 1.83)
-ax2.set_yticks(np.arange(0, y2 * 1.83, 500))
-ax2.set_ylabel('Force per yarn [N]')
+ax2.plot(L_arr, np.array(slip_left), '--')
+ax2.plot(L_arr, np.array(slip_right), '--')
+ax2.set_ylim(0, 2)
+
+ax2.set_ylabel('corresponding slips [mm]')
+
 
 # plt.figure()
 # plt_expri(20, x, lorenz_avg, '20', 'm')

@@ -3,6 +3,7 @@
 	<name>cbfe</name>
 	<comment></comment>
 	<projects>
+		<project>bmcs</project>
 		<project>ibvpy</project>
 		<project>mathkit</project>
 		<project>sctt</project>

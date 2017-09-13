@@ -368,7 +368,6 @@ plt.legend(loc='best', ncol=2)
 
 
 # prediction length vs maximum force
-figure = plt.figure()
 #
 ts = TStepper()
 ts.fets_eval.A_f = 1.85
@@ -385,62 +384,80 @@ def predict_max(L_x, slip, bond):
     U_record, F_record, sf_record = tl.eval()
     n_dof = 2 * ts.domain.n_active_elems + 1
     max_F_idx = np.argmax(F_record[:, n_dof])
-    print max_F_idx
     U = np.reshape(U_record[max_F_idx, :], (-1, 2)).T
     slip = U[1] - U[0]
     return F_record[:, n_dof][max_F_idx], slip[0], slip[-1]
 
+
+def predict_max_limited_slip(L_x, slip, bond, s_limit):
+    # the maximum pull-out force for give allowed slip s_limit
+    tl.ts.L_x = L_x
+    tl.ts.mats_eval.slip = slip.tolist()
+    tl.ts.mats_eval.bond = bond.tolist()
+    U_record, F_record, sf_record = tl.eval()
+    n_dof = 2 * ts.domain.n_active_elems + 1
+    slip_left = U_record[:, ts.domain.n_active_elems + 1] - U_record[:, 0]
+    idx = np.argmin(np.abs(slip_left - s_limit))
+    pull_force = F_record[:, n_dof][0:idx + 1]
+    return np.amax(pull_force)
+
+
 L_arr = np.arange(10, 410, 50)
-dpo_max = []
-slip_left = []
-slip_right = []
-lorenz_max = []
-for L in L_arr:
-    F_max, sl, sr = predict_max(L, x, y)
-    dpo_max.append(F_max)
-    slip_left.append(sl)
-    slip_right.append(sr)
-#     lorenz_max.append(predict_max(L, x, lorenz_avg))
-fig = figure.add_subplot(111)
-fig.plot(L_arr, np.array(dpo_max) / 1.83, label='DPO')
-# fig.plot(L_arr, np.array(lorenz_max) / 1.83, label='Lorenz')
-fig.set_ylim(0, )
-fig.set_xlim(0, )
-fig.set_xlabel('anchorage length [mm]')
-fig.set_ylabel('yarn stress[MPa]')
-plt.legend(loc='best')
 
-length_arr = np.array([50, 100, 150, 200, 250, 300, 350])
-length_arr = np.repeat(length_arr, 3)
-max_force_arr = np.array([3.114, 3.385, 3.768, 5.346, 5.953, 6.603, 8.194, 9.044, 9.222, 8.729,
-                          10.099, 10.228, 12.567, 13.458, 14.013, 16.532, 17.332, 16.204, 15.431, 18.053, 18.624])
-plt.plot(length_arr, max_force_arr * 1000 / 9. / 1.83, 'k.')
+if __name__ == '__main__':
 
-y1, y2 = fig.get_ylim()
+    figure = plt.figure()
 
-# ax2 = fig.twinx()
-# ax2.set_ylim(0, y2 * 1.83)
-# ax2.set_yticks(np.arange(0, y2 * 1.83, 500))
-# ax2.set_ylabel('Force per yarn [N]')
+    dpo_max = []
 
-ax2 = fig.twinx()
-ax2.plot(L_arr, np.array(slip_left), '--')
-ax2.plot(L_arr, np.array(slip_right), '--')
-ax2.set_ylim(0, 2)
+    slip_left = []
+    slip_right = []
+    lorenz_max = []
+    for L in L_arr:
+        F_max, sl, sr = predict_max(L, x, y)
+        dpo_max.append(F_max)
+        slip_left.append(sl)
+        slip_right.append(sr)
+    #     lorenz_max.append(predict_max(L, x, lorenz_avg))
 
-ax2.set_ylabel('corresponding slips [mm]')
+    fig = figure.add_subplot(111)
+    fig.plot(L_arr, np.array(dpo_max) / 1.83, label='DPO')
+    # fig.plot(L_arr, np.array(lorenz_max) / 1.83, label='Lorenz')
+    fig.set_ylim(0, )
+    fig.set_xlim(0, )
+    fig.set_xlabel('anchorage length [mm]')
+    fig.set_ylabel('yarn stress[MPa]')
+    plt.legend(loc='best')
 
+    length_arr = np.array([50, 100, 150, 200, 250, 300, 350])
+    length_arr = np.repeat(length_arr, 3)
+    max_force_arr = np.array([3.114, 3.385, 3.768, 5.346, 5.953, 6.603, 8.194, 9.044, 9.222, 8.729,
+                              10.099, 10.228, 12.567, 13.458, 14.013, 16.532, 17.332, 16.204, 15.431, 18.053, 18.624])
+    plt.plot(length_arr, max_force_arr * 1000 / 9. / 1.83, 'k.')
 
-# plt.figure()
-# plt_expri(20, x, lorenz_avg, '20', 'm')
-# plt_expri(100, x, lorenz_avg, '100', 'y')
-# plt_expri(200, x, lorenz_avg, '200', 'k')
-# plt_expri(250, x, lorenz_avg, '250', 'g')
-# plt_expri(280, x, lorenz_avg, '280', 'c')
-# plt_expri(290, x, lorenz_avg, '290', 'l')
-# plt_expri(300, x, lorenz_avg, '300', 'b')
-# plt_expri(350, x, lorenz_avg, '350', 'r')
-plt.legend()
+    y1, y2 = fig.get_ylim()
 
+    # ax2 = fig.twinx()
+    # ax2.set_ylim(0, y2 * 1.83)
+    # ax2.set_yticks(np.arange(0, y2 * 1.83, 500))
+    # ax2.set_ylabel('Force per yarn [N]')
 
-plt.show()
+    ax2 = fig.twinx()
+    ax2.plot(L_arr, np.array(slip_left), '--')
+    ax2.plot(L_arr, np.array(slip_right), '--')
+    ax2.set_ylim(0, 2)
+
+    ax2.set_ylabel('corresponding slips [mm]')
+
+    # plt.figure()
+    # plt_expri(20, x, lorenz_avg, '20', 'm')
+    # plt_expri(100, x, lorenz_avg, '100', 'y')
+    # plt_expri(200, x, lorenz_avg, '200', 'k')
+    # plt_expri(250, x, lorenz_avg, '250', 'g')
+    # plt_expri(280, x, lorenz_avg, '280', 'c')
+    # plt_expri(290, x, lorenz_avg, '290', 'l')
+    # plt_expri(300, x, lorenz_avg, '300', 'b')
+    # plt_expri(350, x, lorenz_avg, '350', 'r')
+    plt.legend()
+
+    plt.show()

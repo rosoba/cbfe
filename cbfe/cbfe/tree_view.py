@@ -15,9 +15,9 @@ from fets1d52ulrh import FETS1D52ULRH
 from ibvpy.api import BCDof
 from matseval import MATSEval
 import numpy as np
-from scratch.mpl_figure_editor import MPLFigureEditor
 from tloop import TLoop
 from tstepper import TStepper
+from util.traits.editors import MPLFigureEditor
 
 
 class Material(HasTraits):

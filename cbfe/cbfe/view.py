@@ -9,7 +9,7 @@ from tstepper import TStepper
 from tloop import TLoop
 from matplotlib import pyplot as plt
 from ibvpy.api import BCDof
-from traits.api import HasTraits, Property, Instance, cached_property, Str, Button, Range, on_trait_change, Array, List
+from traits.api import HasTraits, Property, Instance, cached_property, Str, Button, Range, on_trait_change, Array, List, Any
 from matplotlib.figure import Figure
 from scratch.mpl_figure_editor import MPLFigureEditor
 from traitsui.api import View, Item, Group, HSplit, Handler, InstanceEditor, UItem, VGroup
@@ -19,13 +19,13 @@ import numpy as np
 class Mainwindow(HasTraits):
 
     #     panel = Instance(ControlPanel)
-    mats_eval = Instance(MATSEval)
+    mats_eval = Any
 
-    fets_eval = Instance(FETS1D52ULRH)
+#     fets_eval = Instance(FETS1D52ULRH)
 
-    time_stepper = Instance(TStepper)
+    time_stepper = Any
 
-    time_loop = Instance(TLoop)
+    time_loop = Any
 
     t_record = Array
     U_record = Array
@@ -197,7 +197,7 @@ class Mainwindow(HasTraits):
                              Item('L_x'),
                              Item('time'),
                              Group(Item('mats_eval'),
-                                   Item('fets_eval'),
+                                   # Item('fets_eval'),
                                    Item('time_stepper'),
                                    Item('time_loop'), show_border=True)),
                        show_labels=False),
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     tl = TLoop(ts=ts)
 
     window = Mainwindow(mats_eval=ts.mats_eval,
-                        fets_eval=ts.fets_eval,
+                        #                         fets_eval=ts.fets_eval,
                         time_stepper=ts,
                         time_loop=tl)
     window.draw()

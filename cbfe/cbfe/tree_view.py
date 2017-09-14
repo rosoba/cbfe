@@ -21,8 +21,8 @@ from util.traits.editors import MPLFigureEditor
 
 
 class Material(HasTraits):
-    sigma_y = Range(0.5, 5.5, value=1.05)
-    E_b = Range(1.0, 8.0, value=2.0)
+    sigma_y = Range(0.5, 55, value=1.05)
+    E_b = Range(1.0, 80, value=2.0)
     K_bar = Range(-0.01, 0.15, value=0.08)
     H_bar = Range(-0.1, 0.1, value=0.00)
     alpha = Range(0.50, 2.50, value=1.0)
@@ -229,6 +229,10 @@ class MainWindow(HasTraits):
         l_sig1, = self.ax6.plot(X_ip, self.sig_record[-1][:, :, 2].flatten())
         self.ax6.set_title('stress')
 
+        self.ax3.set_ylim(np.amin(self.sf_record), np.amax(self.sf_record))
+        self.ax4.set_ylim(np.amin(self.U_record), np.amax(self.U_record))
+        self.ax6.set_ylim(np.amin(self.sig_record), np.amax(self.sig_record))
+
         self.figure.canvas.draw()
 
     time = Range(0.00, 1.00, value=1.00)
@@ -267,6 +271,10 @@ class MainWindow(HasTraits):
         l_sig0, = self.ax6.plot(X_ip, self.sig_record[idx][:, :, 0].flatten())
         l_sig1, = self.ax6.plot(X_ip, self.sig_record[idx][:, :, 2].flatten())
         self.ax6.set_title('stress')
+
+        self.ax3.set_ylim(np.amin(self.sf_record), np.amax(self.sf_record))
+        self.ax4.set_ylim(np.amin(self.U_record), np.amax(self.U_record))
+        self.ax6.set_ylim(np.amin(self.sig_record), np.amax(self.sig_record))
 
         self.figure.canvas.draw()
 

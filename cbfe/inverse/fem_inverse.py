@@ -1,9 +1,12 @@
+'''
+Created on 19.01.2016
+
+@author: Yingxiong
+'''
 from envisage.ui.workbench.api import WorkbenchApplication
 from mayavi.sources.api import VTKDataSource, VTKFileReader
-
 from traits.api import implements, Int, Array, HasTraits, Instance, \
     Property, cached_property, Constant, Float, List
-
 from ibvpy.api import BCDof
 from ibvpy.fets.fets_eval import FETSEval, IFETSEval
 from ibvpy.mats.mats1D import MATS1DElastic
@@ -13,45 +16,48 @@ from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-from scipy.misc import derivative
+from scipy.interpolate import interp1d
+from scipy.optimize import newton, brentq, bisect, minimize_scalar
 
 
 class MATSEval(HasTraits):
 
-    E_m = Float(28284, tooltip='Stiffness of the matrix',
+    E_m = Float(28484, tooltip='Stiffness of the matrix',
                 auto_set=False, enter_set=False)
 
     E_f = Float(170000, tooltip='Stiffness of the fiber',
                 auto_set=False, enter_set=False)
 
-#     G = Float(0.1, tooltip='Bond stiffness')
+    slip = List([0.])
 
-    a = Float(1.0)
+    bond = List([0.])
 
-    def get_G(self, slip):
-        #         return 0.1
-        #         print 'slip', slip
-        #         return self.a * np.maximum(10.0 - 10.0 * slip, -0.1)
-        #         return 0.01 * np.maximum(10.0 - 10.0 * slip, -0.1)
-        return derivative(self.get_bond, slip, dx=1e-6)
+    def b_s_law(self, x):
+        return np.interp(x, self.slip, self.bond)
 
-    def get_bond(self, slip):
-        x = slip
-        y = np.zeros_like(x)
-        y[x < 1.05] = 0.1 * x[x < 1.05] - 0.05 * x[x < 1.05] ** 2
-        y[x > 1.05] = 0.1 * 1.05 - 0.05 * \
-            1.05 ** 2 - 0.005 * (x[x > 1.05] - 1.05)
-        return y
+    # the tangential stiffness of the bond interface
+    def G(self, x):
+        d = np.diff(self.bond) / np.diff(self.slip)
+        d = np.append(d, d[-1])
+        G = interp1d(
+            np.array(self.slip), d, kind='zero', fill_value=(0, 0), bounds_error=False)
+        return G(np.abs(x))
 
     def get_corr_pred(self, eps, d_eps, sig, t_n, t_n1):
         n_e, n_ip, n_s = eps.shape
         D = np.zeros((n_e, n_ip, 3, 3))
         D[:, :, 0, 0] = self.E_m
         D[:, :, 2, 2] = self.E_f
-        D[:, :, 1, 1] = self.get_G(eps[:,:, 1])
+        try:
+            D[:, :, 1, 1] = self.G(eps[:,:, 1])
+        except:
+            print np.array(self.slip)
+            print eps[:, :, 1]
+            sys.exit()
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
-        sig[:, :, 1] = self.get_bond(eps[:,:, 1])
+
+        sig[:, :, 1] = self.b_s_law(eps[:,:, 1])
         return sig, D
 
     n_s = Constant(3)
@@ -66,6 +72,10 @@ class FETS1D52ULRH(FETSEval):
     implements(IFETSEval)
 
     debug_on = True
+
+    A_m = Float(120 * 13 - 9 * 1.85, desc='matrix area [mm2]')
+    A_f = Float(9 * 1.85, desc='reinforcement area [mm2]')
+    L_b = Float(1., desc='perimeter of the bond interface [mm]')
 
     # Dimensional mapping
     dim_slice = slice(0, 1)
@@ -100,7 +110,6 @@ class FETS1D52ULRH(FETSEval):
         return np.array([1., 1.], dtype=float)
 
     # Integration parameters
-    #
     ngp_r = 2
 
     def get_N_geo_mtx(self, r_pnt):
@@ -138,8 +147,6 @@ class TStepper(HasTraits):
     '''Time stepper object for non-linear Newton-Raphson solver.
     '''
 
-    L_x = 40.  # length
-
     mats_eval = Property(Instance(MATSEval))
     '''Finite element formulation object.
     '''
@@ -154,22 +161,33 @@ class TStepper(HasTraits):
     def _get_fets_eval(self):
         return FETS1D52ULRH()
 
-    domain = Property(Instance(FEGrid))
+    A = Property()
+    '''array containing the A_m, L_b, A_f
+    '''
+    @cached_property
+    def _get_A(self):
+        return np.array([self.fets_eval.A_m, self.fets_eval.L_b, self.fets_eval.A_f])
+
+    # specimen length
+    L_x = Float(150.)
+
+    # Number of elements
+    n_e_x = Int(10)
+
+    domain = Property(Instance(FEGrid), depends_on='L_x, n_e_x')
     '''Diescretization object.
     '''
     @cached_property
     def _get_domain(self):
-        # Number of elements
-        n_e_x = 20
         # Element definition
         domain = FEGrid(coord_max=(self.L_x,),
-                        shape=(n_e_x,),
+                        shape=(self.n_e_x,),
                         fets_eval=self.fets_eval)
         return domain
 
     bc_list = List(Instance(BCDof))
 
-    J_mtx = Property
+    J_mtx = Property(depends_on='L_x, n_e_x')
     '''Array of Jacobian matrices.
     '''
     @cached_property
@@ -188,14 +206,14 @@ class TStepper(HasTraits):
         J_mtx = np.einsum('ind,enf->eidf', dNr_geo, elem_x_map)
         return J_mtx
 
-    J_det = Property
+    J_det = Property(depends_on='L_x, n_e_x')
     '''Array of Jacobi determinants.
     '''
     @cached_property
     def _get_J_det(self):
         return np.linalg.det(self.J_mtx)
 
-    B = Property
+    B = Property(depends_on='L_x, n_e_x')
     '''The B matrix
     '''
     @cached_property
@@ -289,16 +307,16 @@ class TStepper(HasTraits):
 
         # system matrix
         self.K.reset_mtx()
-        Ke = np.einsum('i,einsd,eist,eimtf,ei->endmf',
-                       w_ip, self.B, D, self.B, self.J_det)
+        Ke = np.einsum('i,s,einsd,eist,eimtf,ei->endmf',
+                       w_ip, self.A, self.B, D, self.B, self.J_det)
 
         self.K.add_mtx_array(
             Ke.reshape(-1, n_el_dofs, n_el_dofs), elem_dof_map)
 
         # internal forces
         # [n_e, n_n, n_dim_dof]
-        Fe_int = np.einsum('i,eis,einsd,ei->end',
-                           w_ip, sig, self.B, self.J_det)
+        Fe_int = np.einsum('i,s,eis,einsd,ei->end',
+                           w_ip, self.A, sig, self.B, self.J_det)
         F_int = -np.bincount(elem_dof_map.flatten(), weights=Fe_int.flatten())
         self.apply_bc(step_flag, self.K, F_int, t_n, t_n1)
         return F_int, self.K, eps, sig
@@ -307,54 +325,129 @@ class TStepper(HasTraits):
 class TLoop(HasTraits):
 
     ts = Instance(TStepper)
-    d_t = Float(0.01)
-    t_max = Float(1.0)
-    k_max = Int(200)
-    tolerance = Float(1e-8)
+    k_max = Int(2000)
+    tolerance = Float(1e-6)
+    w_arr = Array
+    pf_arr = Array
+
+    regularization = True
+
+    # the pull out force corresponding to crack opening w_i and bond stress
+    # tau_i
+    def pf(self, tau_i, w_i, eps, sig):
+        eps_temp = np.copy(eps)
+        sig_temp = np.copy(sig)
+        dw = w_i - self.ts.mats_eval.slip[-2]
+        n = 10.
+        d_t = dw / n
+        self.ts.mats_eval.bond[-1] = tau_i
+#         print d_t, 'dt'
+        for _ in range(int(n)):
+            step_flag = 'predictor'
+            d_U_k = np.zeros(self.ts.domain.n_dofs)
+            k = 0
+            while k < self.k_max:
+                R, K, eps_temp, sig_temp = self.ts.get_corr_pred(
+                    step_flag, d_U_k, eps_temp, sig_temp, 0., d_t)
+                F_ext = -R
+                K.apply_constraints(R)
+                d_U_k = K.solve()
+                k += 1
+                if k == self.k_max:
+                    print tau_i
+                    print np.linalg.norm(R)
+                    raise Exception('Non convergence')
+                step_flag = 'corrector'
+                if np.linalg.norm(R) < self.tolerance:
+                    #                     print F_ext[-1]
+                    break
+        return F_ext[-1]
+
+    def update_eps_sig(self, w_i, eps, sig):
+
+        eps_temp = np.copy(eps)
+        sig_temp = np.copy(sig)
+        dw = w_i - self.ts.mats_eval.slip[-2]
+        n = 20.
+        d_t = dw / n
+
+        for _ in range(int(n)):
+            step_flag = 'predictor'
+            d_U_k = np.zeros(self.ts.domain.n_dofs)
+            k = 0
+            while k < self.k_max:
+                R, K, eps_temp, sig_temp = self.ts.get_corr_pred(
+                    step_flag, d_U_k, eps_temp, sig_temp, 0., d_t)
+                F_ext = -R
+                K.apply_constraints(R)
+                d_U_k = K.solve()
+                k += 1
+                if k == self.k_max:
+                    print np.linalg.norm(R)
+                    raise Exception('Non convergence')
+                step_flag = 'corrector'
+                if np.linalg.norm(R) < self.tolerance:
+                    break
+        return eps_temp, sig_temp
+
+    def pf_w(self, w):
+        return np.interp(w, self.w_arr, self.pf_arr)
 
     def eval(self):
 
-        ts.apply_essential_bc()
-
-        t_n = 0.
-        t_n1 = t_n
+        self.ts.apply_essential_bc()
         n_dofs = self.ts.domain.n_dofs
         n_e = self.ts.domain.n_active_elems
         n_ip = self.ts.fets_eval.n_gp
         n_s = self.ts.mats_eval.n_s
-        U_record = np.zeros(n_dofs)
-        F_record = np.zeros(n_dofs)
-        U_k = np.zeros(n_dofs)
+
         eps = np.zeros((n_e, n_ip, n_s))
         sig = np.zeros((n_e, n_ip, n_s))
 
-        while t_n1 <= self.t_max:
-            t_n1 = t_n + self.d_t
-            print t_n1
-            k = 0
-            step_flag = 'predictor'
-            d_U = np.zeros(n_dofs)
-            d_U_k = np.zeros(n_dofs)
-            while k < self.k_max:
-                R, K, eps, sig = ts.get_corr_pred(
-                    step_flag, d_U_k, eps, sig, t_n, t_n1)
+        i = 0
 
-                F_ext = -R
-                K.apply_constraints(R)
-                d_U_k = K.solve()
-                d_U += d_U_k
-                if np.linalg.norm(R) < self.tolerance:
-                    F_record = np.vstack((F_record, F_ext))
-                    U_k += d_U
-                    U_record = np.vstack((U_record, U_k))
-                    break
-                k += 1
-                if k == self.k_max:
-                    print 'nonconvergence'
-                step_flag = 'corrector'
+        eps1 = np.copy(eps)
+        sig1 = np.copy(sig)
 
-            t_n = t_n1
-        return U_record, F_record
+        while i < len(self.w_arr) - 1:
+            i += 1
+
+            self.ts.mats_eval.slip.append(self.w_arr[i])
+            self.ts.mats_eval.bond.append(0.)
+            print self.w_arr[i]
+            tau = lambda tau_i: self.pf(
+                tau_i, self.w_arr[i], eps1, sig1) - self.pf_arr[i]
+            try:
+                tau_i = brentq(tau, 0.00001, 200., xtol=1e-16)
+            except:
+                print tau(0.1)
+                print tau(200)
+                plt.plot(self.ts.mats_eval.slip, self.ts.mats_eval.bond)
+                plt.xlabel('slip [mm]')
+                plt.ylabel('bond [N/mm]')
+                plt.show()
+            print tau_i
+            print '============='
+            self.ts.mats_eval.bond[-1] = tau_i
+#
+            eps1, sig1 = self.update_eps_sig(self.w_arr[i], eps1, sig1)
+
+            # regularization
+            if self.regularization:
+                n = 2
+                if i % float(n) == 0.:
+                    b_avg = np.mean(self.ts.mats_eval.bond[-n:])
+                    s_avg = np.mean(self.ts.mats_eval.slip[-n:])
+                    del self.ts.mats_eval.bond[-n:]
+                    del self.ts.mats_eval.slip[-n:]
+                    self.ts.mats_eval.bond.append(b_avg)
+                    self.ts.mats_eval.slip.append(s_avg)
+
+                    eps, sig = self.update_eps_sig(s_avg, eps, sig)
+                    eps1 = np.copy(eps)
+                    sig1 = np.copy(sig)
+
+        return self.ts.mats_eval.slip, self.ts.mats_eval.bond
 
 if __name__ == '__main__':
 
@@ -362,38 +455,46 @@ if __name__ == '__main__':
     # nonlinear solver
     #=========================================================================
     # initialization
-    #     for L in [10, 20, 40, 80, 160, 320]:
 
-    L = 700.
-
-    ts = TStepper(L_x=L)
+    ts = TStepper(L_x=150.,  # half of speciment length
+                  n_e_x=10  # number of elements
+                  )
 
     n_dofs = ts.domain.n_dofs
 
-#     tf = lambda t: 1 - np.abs(t - 1)
+    ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),  # the fixed DOF
+                  BCDof(var='u', dof=n_dofs - 1, value=1.0)]  # the DOF on which the displacement is applied
 
-    ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
-                  BCDof(var='u', dof=n_dofs - 1, value=3.0)]
+    fpath = 'D:\\data\\pull_out\\all\\DPO-30cm-V3_R4_f.asc'
+    x, y = np.loadtxt(fpath,  delimiter=';')
 
-    tl = TLoop(ts=ts)
+    x[0] = 0.
+    y[0] = 0.
 
-#     a_arr = np.random.normal(loc=1.0, scale=0.1, size=20)
+    interp = interp1d(x / 2., y)
 
-    U_avg = []
-    F_avg = []
+    x = np.hstack((0, np.linspace(0.53, 4.4, 10000)))
 
-    U_record, F_record = tl.eval()
-    n_dof = 2 * ts.domain.n_active_elems + 1
-#     np.savetxt('D:\\1.txt', np.vstack((
-#         U_record[:, n_dofs - 1], F_record[:, n_dofs - 1])))
-#     x, y = np.loadtxt('D:\\1.txt')
-#     plt.plot(x, y)
-    plt.plot(U_record[:, n_dof], F_record[:, n_dof], label=str(L))
-#     U_avg.append(U_record[:, n_dof])
-#     F_avg.append(F_record[:, n_dof])
-#     plt.plot(np.average(U_avg, axis=0), np.average(
-#         F_avg, axis=0), 'b--', label='average of 100 yarns')
-    plt.legend(loc='best')
-    plt.xlabel('displacement')
-    plt.ylabel('pull-out force')
+    interp1 = interp1d(x, interp(x))
+
+    w_arr = np.hstack(
+        (np.linspace(0, 0.8, 6), 1.1, 1.2, 1.4, 1.6, 1.8, np.linspace(2.0, 4.4, 14)))
+#     w_arr = np.array([0., 1.1295, 1.98864, 3., 4., 5., 6., 7., 8.,
+# 9., 11.8682, 13.7705, 15., 16., 17., 18., 19., 20., ]) / 2.
+
+    pf_arr = interp1(w_arr) * 1000.
+
+    tl = TLoop(ts=ts, w_arr=w_arr, pf_arr=pf_arr)
+
+    slip, bond = tl.eval()
+
+    np.set_printoptions(precision=4)
+    print 'slip'
+    print [np.array(slip)]
+    print 'bond'
+    print [np.array(bond)]
+
+    plt.plot(slip, bond)
+    plt.xlabel('slip [mm]')
+    plt.ylabel('bond [N/mm]')
     plt.show()

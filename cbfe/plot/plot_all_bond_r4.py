@@ -128,44 +128,47 @@ tl = TLoop(ts=ts)
 plt.figure()
 
 
-def plt_expri(L_x, slip, bond, label, color):
+def plt_expri(L_x, slip, bond, fpath, label, color):
     tl.ts.L_x = L_x
     tl.ts.mats_eval.slip = slip.tolist()
     tl.ts.mats_eval.bond = bond.tolist()
-    U_record, F_record = tl.eval()
+    U_record, F_record, sf_record = tl.eval()
     n_dof = 2 * ts.domain.n_active_elems + 1
     plt.plot(U_record[:, n_dof], F_record[:, n_dof],
              marker='.', color='k', markevery=5)
-#     d, f = np.loadtxt(fpath,  delimiter=';')
+    d, f = np.loadtxt(fpath,  delimiter=';')
 #     plt.plot(x, np.interp(x, d / 2., f * 1000.),
 #              '--', color=color, label=label)
-#     plt.plot(d[d <= 11.] / 2., f[d <= 11.] * 1000.,
-#              '--', color=color, label=label)
+    plt.plot(d[d <= 11.] / 2., f[d <= 11.] * 1000.,
+             '--', color=color, label=label)
 
 
-# plt_expri(
-#     50, slip1, bond1, 'D:\\data\\pull_out\\all\\DPO-10cm-V1_R4_f.asc', '10-v1', 'g')
-# plt_expri(
-#     50, slip2, bond2, 'D:\\data\\pull_out\\all\\DPO-10cm-V2_R4_f.asc',
-#     '10-v2', 'g')
-# plt_expri(
-#     50, slip3, bond3, 'D:\\data\\pull_out\\all\\DPO-10cm-V3_R4_f.asc',
-#     '10-v3', 'g')
-# plt_expri(
-#     100, slip4, bond4, 'D:\\data\\pull_out\\all\\DPO-20cm-V1_R4_f.asc',
-#     '20-v1', 'k')
-# plt_expri(
-#     100, slip5, bond5, 'D:\\data\\pull_out\\all\\DPO-20cm-V2_R4_f.asc',
-#     '20-v2', 'k')
-# plt_expri(
-#     100, slip6, bond6, 'D:\\data\\pull_out\\all\\DPO-20cm-V3_R4_f.asc',
-#     '20-v3', 'k')
-# plt_expri(
-#     150, slip7, bond7, 'D:\\data\\pull_out\\all\\DPO-30cm-V1_R4_f.asc',
-#     '30-v1', 'b')
-# plt_expri(
-#     150, slip8, bond8, 'D:\\data\\pull_out\\all\\DPO-30cm-V2_R4_f.asc',
-#     '30-v2', 'b')
+plt_expri(
+    50, slip1, bond1, 'D:\\data\\pull_out\\all\\DPO-10cm-V1_R4_f.asc', '10-v1', 'g')
+# plt.show()
+
+plt_expri(
+    50, slip2, bond2, 'D:\\data\\pull_out\\all\\DPO-10cm-V2_R4_f.asc',
+    '10-v2', 'g')
+plt_expri(
+    50, slip3, bond3, 'D:\\data\\pull_out\\all\\DPO-10cm-V3_R4_f.asc',
+    '10-v3', 'g')
+plt_expri(
+    100, slip4, bond4, 'D:\\data\\pull_out\\all\\DPO-20cm-V1_R4_f.asc',
+    '20-v1', 'k')
+plt_expri(
+    100, slip5, bond5, 'D:\\data\\pull_out\\all\\DPO-20cm-V2_R4_f.asc',
+    '20-v2', 'k')
+plt_expri(
+    100, slip6, bond6, 'D:\\data\\pull_out\\all\\DPO-20cm-V3_R4_f.asc',
+    '20-v3', 'k')
+plt_expri(
+    150, slip7, bond7, 'D:\\data\\pull_out\\all\\DPO-30cm-V1_R4_f.asc',
+    '30-v1', 'b')
+plt_expri(
+    150, slip8, bond8, 'D:\\data\\pull_out\\all\\DPO-30cm-V2_R4_f.asc',
+    '30-v2', 'b')
+# plt.show()
 # plt_expri(
 #     150, slip9, bond9, 'D:\\data\\pull_out\\all\\DPO-30cm-V3_R4_f.asc', '30-v3', 'b')
 #
@@ -180,93 +183,93 @@ def plt_expri(L_x, slip, bond, label, color):
 # prediction
 
 
-# tl.ts.mats_eval.slip = x.tolist()
-# tl.ts.mats_eval.bond = y.tolist()
+tl.ts.mats_eval.slip = x.tolist()
+tl.ts.mats_eval.bond = y.tolist()
 #
-# plt.figure()
-# tl.ts.L_x = 200.
-# U_record, F_record = tl.eval()
-# n_dof = 2 * ts.domain.n_active_elems + 1
-# plt.plot(U_record[:, n_dof], F_record[:, n_dof],
-#          marker='.', color='k', label='predicted', markevery=5)
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-40cm-V1_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='40-v1')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-40cm-V2_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='40-v2')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-40cm-V3_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='40-v3')
-#
-# plt.legend(loc='best', ncol=2)
-# plt.xlabel('displacement[mm]')
-# plt.ylabel('pull-out force[N]')
-# plt.ylim(0,)
-#
-#
-# plt.figure()
-# tl.ts.L_x = 250.
-# U_record, F_record = tl.eval()
-# n_dof = 2 * ts.domain.n_active_elems + 1
-# plt.plot(U_record[:, n_dof], F_record[:, n_dof],
-#          marker='.', color='k', markevery=5, label='predicted')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-50cm-V1_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v1')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-50cm-V2_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v2')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-50cm-V3_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v3')
-# plt.legend(loc='best', ncol=2)
-# plt.xlabel('displacement[mm]')
-# plt.ylabel('pull-out force[N]')
-# plt.ylim(0,)
-#
-# plt.figure()
-# tl.ts.L_x = 300.
-# U_record, F_record = tl.eval()
-# n_dof = 2 * ts.domain.n_active_elems + 1
-# plt.plot(U_record[:, n_dof], F_record[:, n_dof],
-#          marker='.', color='k', label='predicted', markevery=5)
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-60cm-V1_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v1')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-60cm-V2_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v2')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-60cm-V3_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v3')
-# plt.legend(loc='best', ncol=2)
-# plt.xlabel('displacement[mm]')
-# plt.ylabel('pull-out force[N]')
-# plt.ylim(0,)
-#
-#
-# plt.figure()
-# tl.ts.L_x = 350.
-# U_record, F_record = tl.eval()
-# n_dof = 2 * ts.domain.n_active_elems + 1
-# plt.plot(U_record[:, n_dof], F_record[:, n_dof],
-#          marker='.', color='k', label='predicted', markevery=5)
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-70cm-V1_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v1')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-70cm-V2_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v2')
-# d, f = np.loadtxt(
-#     'D:\\data\\pull_out\\all\\DPO-70cm-V3_R4_f.asc',  delimiter=';')
-# plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v3')
-# plt.legend(loc='best', ncol=2)
-# plt.xlabel('displacement[mm]')
-# plt.ylabel('pull-out force[N]')
-# plt.ylim(0,)
+plt.figure()
+tl.ts.L_x = 200.
+U_record, F_record, sf_record = tl.eval()
+n_dof = 2 * ts.domain.n_active_elems + 1
+plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+         marker='.', color='k', label='predicted', markevery=5)
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-40cm-V1_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='40-v1')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-40cm-V2_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='40-v2')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-40cm-V3_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='40-v3')
+
+plt.legend(loc='best', ncol=2)
+plt.xlabel('displacement[mm]')
+plt.ylabel('pull-out force[N]')
+plt.ylim(0,)
 
 
+plt.figure()
+tl.ts.L_x = 250.
+U_record, F_record, sf_record = tl.eval()
+n_dof = 2 * ts.domain.n_active_elems + 1
+plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+         marker='.', color='k', markevery=5, label='predicted')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-50cm-V1_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v1')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-50cm-V2_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v2')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-50cm-V3_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='50-v3')
+plt.legend(loc='best', ncol=2)
+plt.xlabel('displacement[mm]')
+plt.ylabel('pull-out force[N]')
+plt.ylim(0,)
+
+plt.figure()
+tl.ts.L_x = 300.
+U_record, F_record, sf_record = tl.eval()
+n_dof = 2 * ts.domain.n_active_elems + 1
+plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+         marker='.', color='k', label='predicted', markevery=5)
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-60cm-V1_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v1')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-60cm-V2_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v2')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-60cm-V3_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='60-v3')
+plt.legend(loc='best', ncol=2)
+plt.xlabel('displacement[mm]')
+plt.ylabel('pull-out force[N]')
+plt.ylim(0,)
+
+
+plt.figure()
+tl.ts.L_x = 350.
+U_record, F_record, sf_record = tl.eval()
+n_dof = 2 * ts.domain.n_active_elems + 1
+plt.plot(U_record[:, n_dof], F_record[:, n_dof],
+         marker='.', color='k', label='predicted', markevery=5)
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-70cm-V1_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v1')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-70cm-V2_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v2')
+d, f = np.loadtxt(
+    'D:\\data\\pull_out\\all\\DPO-70cm-V3_R4_f.asc',  delimiter=';')
+plt.plot(x, np.interp(x, d / 2., f * 1000.), '--', label='70-v3')
+plt.legend(loc='best', ncol=2)
+plt.xlabel('displacement[mm]')
+plt.ylabel('pull-out force[N]')
+plt.ylim(0,)
+
+plt.show()
 # compare with lorenz
 
 plt.figure()

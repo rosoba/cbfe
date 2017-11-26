@@ -147,19 +147,23 @@ class TStepper(HasTraits):
     '''Time stepper object for non-linear Newton-Raphson solver.
     '''
 
-    mats_eval = Property(Instance(MATSEval))
-    '''Finite element formulation object.
-    '''
-    @cached_property
-    def _get_mats_eval(self):
-        return MATSEval()
+#     mats_eval = Property(Instance(MATSEval))
+#     '''Finite element formulation object.
+#     '''
+#     @cached_property
+#     def _get_mats_eval(self):
+#         return MATSEval()
+#
+#     fets_eval = Property(Instance(FETS1D52ULRH))
+#     '''Finite element formulation object.
+#     '''
+#     @cached_property
+#     def _get_fets_eval(self):
+#         return FETS1D52ULRH()
 
-    fets_eval = Property(Instance(FETS1D52ULRH))
-    '''Finite element formulation object.
-    '''
-    @cached_property
-    def _get_fets_eval(self):
-        return FETS1D52ULRH()
+    mats_eval = Instance(MATSEval, arg=(), kw={})  # material model
+
+    fets_eval = Instance(FETS1D52ULRH, arg=(), kw={})  # element formulation
 
     A = Property()
     '''array containing the A_m, L_b, A_f
@@ -418,10 +422,11 @@ class TLoop(HasTraits):
             tau = lambda tau_i: self.pf(
                 tau_i, self.w_arr[i], eps1, sig1) - self.pf_arr[i]
             try:
-                tau_i = brentq(tau, 0.00001, 200., xtol=1e-16)
+                tau_i = brentq(tau, 0.00001, 1000., xtol=1e-16)
             except:
+                print "range not correct f(a)*f(b)>0"
                 print tau(0.1)
-                print tau(200)
+                print tau(1000.)
                 plt.plot(self.ts.mats_eval.slip, self.ts.mats_eval.bond)
                 plt.xlabel('slip [mm]')
                 plt.ylabel('bond [N/mm]')

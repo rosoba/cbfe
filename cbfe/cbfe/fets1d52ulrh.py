@@ -23,7 +23,6 @@ class FETS1D52ULRH(FETSEval):
 #     A_f = Float(9 * 1.85, desc='reinforcement area [mm2]')
 #     P_b = Float(9 * np.sqrt(np.pi * 4 * 1.85),
 #                 desc='perimeter of the bond interface [mm]')
-
     A_m = Float(1)
     A_f = Float(1)
     P_b = Float(1)

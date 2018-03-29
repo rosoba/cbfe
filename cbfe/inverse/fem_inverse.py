@@ -422,15 +422,17 @@ class TLoop(HasTraits):
             tau = lambda tau_i: self.pf(
                 tau_i, self.w_arr[i], eps1, sig1) - self.pf_arr[i]
             try:
-                tau_i = brentq(tau, 0.00001, 1000., xtol=1e-16)
+                tau_i = brentq(tau, 1e-6, 1000., xtol=1e-16)
             except:
-                print "range not correct f(a)*f(b)>0"
+                #                 print "range not correct f(a)*f(b)>0"
                 print tau(0.1)
                 print tau(1000.)
-                plt.plot(self.ts.mats_eval.slip, self.ts.mats_eval.bond)
-                plt.xlabel('slip [mm]')
-                plt.ylabel('bond [N/mm]')
-                plt.show()
+#                 plt.plot(self.ts.mats_eval.slip, self.ts.mats_eval.bond)
+#                 plt.xlabel('slip [mm]')
+#                 plt.ylabel('bond [N/mm]')
+#                 plt.show()
+                tau_i = 0.
+
             print tau_i
             print '============='
             self.ts.mats_eval.bond[-1] = tau_i
@@ -439,7 +441,7 @@ class TLoop(HasTraits):
 
             # regularization
             if self.regularization:
-                n = 2
+                n = 4
                 if i % float(n) == 0.:
                     b_avg = np.mean(self.ts.mats_eval.bond[-n:])
                     s_avg = np.mean(self.ts.mats_eval.slip[-n:])

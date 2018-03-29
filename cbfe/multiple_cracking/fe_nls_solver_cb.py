@@ -448,14 +448,21 @@ if __name__ == '__main__':
 # 96.66808302759236, 100.23305856244875, 103.01090365681807,
 # 103.98920712455558, 104.69444418370917, 105.09318577617957]
 
-    ts.mats_eval.slip = [0, 0.1, 0.2, 0.3, 0.4, 0.5]
-    ts.mats_eval.bond = [0., 10., 20., 30., 40., 50.]
+#     ts.mats_eval.slip = [0, 0.1, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3, 0.4, 0.5]
+#     ts.mats_eval.bond = [0., 15., 30., 19., 17., 13., 7.,  5., 3., 1.]
+
+    ts.mats_eval.slip = [0, 1e-8,  0.5]
+    ts.mats_eval.bond = [0., 16., 16.]
 
     n_dofs = ts.domain.n_dofs
 
 #     tf = lambda t: 1 - np.abs(t - 1)
 
-    ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
+#     ts.bc_list = [BCDof(var='u', dof=n_dofs - 2, value=0.0),
+#                   BCDof(var='u', dof=n_dofs - 1, value=0.5)]
+
+    ts.bc_list = [BCDof(var='u', dof=0, value=0.0),
+                  BCDof(var='u', dof=1, value=0.0),
                   BCDof(var='u', dof=n_dofs - 1, value=0.5)]
 
     tl = TLoop(ts=ts)
@@ -465,14 +472,78 @@ if __name__ == '__main__':
     plt.plot(U_record[:, n_dof], F_record[:, n_dof],
              marker='.', label='numerical')
 
+    def avg_sig(sig):
+        '''average the stress on the integration points to the nodes'''
+        sig = np.hstack((sig[:, 0:1], sig, sig[:, -1::]))
+        sig = (sig[:, 0::2] + sig[:, 1::2]) / 2.
+        sig[:, -1] = 0.
+        return sig
+
+    sig_m = avg_sig(sig_m_record)
+    X = np.linspace(0, ts.L_x, ts.n_e_x + 1)
+    from scipy.interpolate import interp2d
+    interp_m = interp2d(X[::-1], F_record[:, -1], sig_m)
+    plt.figure()
+    x = np.linspace(0, ts.L_x, 500)
+    F_arr = np.linspace(0, np.amax(F_record[:, -1]), 20)
+
+    am = 120. * 13. - 9. * 1.85
+    af = 9. * 1.85
+    A = am + af
+    E_c = (ts.mats_eval.E_m * am + ts.mats_eval.E_f * af) / A
+
+    F_arr = np.append(
+        F_arr, [1.24999 * E_c / ts.mats_eval.E_m * A, 1.7325 * E_c / ts.mats_eval.E_m * A])
+    F_arr.sort()
+
+    sig_m_150 = []
+
+    sm = plt.cm.ScalarMappable(
+        cmap='Greys', norm=plt.Normalize(vmin=0, vmax=5))
+    # fake up the array of the scalar mappable. Urgh...
+    sm._A = [1, 2, 3, 4, 5]
+    plt.colorbar(sm)
+
+    def sig_m(z, sig_c):  # matrix stress
+        T = 0.9
+        sig_m = np.minimum(
+            z * T * af / am, ts.mats_eval.E_m * sig_c / E_c)
+        return sig_m
+
+    for i, F in enumerate(F_arr):
+        if F / A / E_c * ts.mats_eval.E_m < 1.25:
+            plt.plot(x, np.ones_like(x) * F / A / E_c *
+                     ts.mats_eval.E_m, 'k', alpha=float(i) / 21.)
+            sig_m_150.append(F / A / E_c * ts.mats_eval.E_m)
+        else:
+            #             plt.plot(x, interp_m(x, F), 'k', alpha=float(i) / 21.)
+            #             sig_m_150.append(interp_m(100., F))
+            plt.plot(x, sig_m(x, F / A), 'k', alpha=float(i) / 21.)
+            sig_m_150.append(sig_m(150., F / A))
+
+    plt.xlabel('z')
+    plt.ylabel('sig_m')
+
+    plt.figure()
+    plt.plot(F_arr / A, sig_m_150)
+
+#     for i in np.arange(len(sig_m_150) - 1):
+#         plt.plot([F_arr[i] / (120. * 13.), F_arr[i + 1] / (120. * 13.)],
+#                  [sig_m_150[i], sig_m_150[i + 1]], 'k', alpha=float(i) / 200.)
+
+    plt.xlabel('sig_c')
+    plt.ylabel('sig_m at z = 150')
+
+    plt.show()
+
 #     ts.L_x = 200
 #     U_record, F_record, sf_record, sig_m_record, sig_f_record = tl.eval()
 #     n_dof = 2 * ts.domain.n_active_elems + 1
 #     plt.plot(U_record[:, n_dof], F_record[:, n_dof],
 #              marker='.', label='numerical')
 
-    plt.xlabel('displacement [mm]')
-    plt.ylabel('pull-out force [N]')
+#     plt.xlabel('displacement [mm]')
+#     plt.ylabel('pull-out force [N]')
 #     plt.ylim(0, 20000)
     plt.legend(loc='best')
 

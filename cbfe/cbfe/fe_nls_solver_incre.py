@@ -14,6 +14,8 @@ from scipy.interpolate import interp1d
 
 class MATSEval(HasTraits):
 
+    '''for monotonic pull-out response'''
+
     E_m = Float(28484., tooltip='Stiffness of the matrix',
                 auto_set=False, enter_set=False)
 
@@ -284,8 +286,6 @@ class TStepper(HasTraits):
 
         # update strain
         eps += d_eps
-#         if np.any(sig) == np.nan:
-#             sys.exit()
 
         # material response state variables at integration point
         sig, D = mats_eval.get_corr_pred(eps, d_eps, sig, t_n, t_n1)

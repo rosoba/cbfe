@@ -3,21 +3,23 @@ Created on 19.01.2016
 
 @author: Yingxiong
 '''
+import sys
+
 from envisage.ui.workbench.api import WorkbenchApplication
-from mayavi.sources.api import VTKDataSource, VTKFileReader
-from traits.api import implements, Int, Array, HasTraits, Instance, \
-    Property, cached_property, Constant, Float, List
 from ibvpy.api import BCDof
 from ibvpy.fets.fets_eval import FETSEval, IFETSEval
 from ibvpy.mats.mats1D import MATS1DElastic
 from ibvpy.mats.mats1D5.mats1D5_bond import MATS1D5Bond
 from ibvpy.mesh.fe_grid import FEGrid
 from mathkit.matrix_la.sys_mtx_assembly import SysMtxAssembly
-import matplotlib.pyplot as plt
-import numpy as np
-import sys
+from mayavi.sources.api import VTKDataSource, VTKFileReader
 from scipy.interpolate import interp1d
 from scipy.optimize import newton, brentq, bisect, minimize_scalar
+from traits.api import implements, Int, Array, HasTraits, Instance, \
+    Property, cached_property, Constant, Float, List
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class MATSEval(HasTraits):
@@ -49,7 +51,7 @@ class MATSEval(HasTraits):
         D[:, :, 0, 0] = self.E_m
         D[:, :, 2, 2] = self.E_f
         try:
-            D[:, :, 1, 1] = self.G(eps[:,:, 1])
+            D[:, :, 1, 1] = self.G(eps[:, :, 1])
         except:
             print np.array(self.slip)
             print eps[:, :, 1]
@@ -57,7 +59,7 @@ class MATSEval(HasTraits):
         d_sig = np.einsum('...st,...t->...s', D, d_eps)
         sig += d_sig
 
-        sig[:, :, 1] = self.b_s_law(eps[:,:, 1])
+        sig[:, :, 1] = self.b_s_law(eps[:, :, 1])
         return sig, D
 
     n_s = Constant(3)
@@ -248,7 +250,7 @@ class TStepper(HasTraits):
 
         # shape function for the unknowns
         # [ d, n, i]
-        Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None,:])
+        Nr = 0.5 * (1. + geo_r[:, :, None] * r_ip[None, :])
         dNr = 0.5 * geo_r[:, :, None] * np.array([1, 1])
 
         # [ i, n, d ]
@@ -262,9 +264,9 @@ class TStepper(HasTraits):
         B_N_n_rows, B_N_n_cols, N_idx = [1, 1], [0, 1], [0, 0]
         B_dN_n_rows, B_dN_n_cols, dN_idx = [0, 2], [0, 1], [0, 0]
         B_factors = np.array([-1, 1], dtype='float_')
-        B[:, :,:, B_N_n_rows, B_N_n_cols] = (B_factors[None, None,:] *
+        B[:, :, :, B_N_n_rows, B_N_n_cols] = (B_factors[None, None, :] *
                                               Nx[:, :, N_idx])
-        B[:, :,:, B_dN_n_rows, B_dN_n_cols] = dNx[:,:,:, dN_idx]
+        B[:, :, :, B_dN_n_rows, B_dN_n_cols] = dNx[:, :, :, dN_idx]
 
         return B
 
@@ -333,6 +335,8 @@ class TLoop(HasTraits):
     tolerance = Float(1e-6)
     w_arr = Array
     pf_arr = Array
+
+    n = Int(4, auto_set=False, enter_set=True)
 
     regularization = True
 
@@ -419,8 +423,11 @@ class TLoop(HasTraits):
             self.ts.mats_eval.slip.append(self.w_arr[i])
             self.ts.mats_eval.bond.append(0.)
             print self.w_arr[i]
-            tau = lambda tau_i: self.pf(
-                tau_i, self.w_arr[i], eps1, sig1) - self.pf_arr[i]
+
+            def tau(tau_i):
+                return self.pf(
+                    tau_i, self.w_arr[i], eps1, sig1
+                ) - self.pf_arr[i]
             try:
                 tau_i = brentq(tau, 1e-6, 1000., xtol=1e-16)
             except:
@@ -441,7 +448,7 @@ class TLoop(HasTraits):
 
             # regularization
             if self.regularization:
-                n = 4
+                n = self.n
                 if i % float(n) == 0.:
                     b_avg = np.mean(self.ts.mats_eval.bond[-n:])
                     s_avg = np.mean(self.ts.mats_eval.slip[-n:])
@@ -455,6 +462,7 @@ class TLoop(HasTraits):
                     sig1 = np.copy(sig)
 
         return self.ts.mats_eval.slip, self.ts.mats_eval.bond
+
 
 if __name__ == '__main__':
 

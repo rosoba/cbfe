@@ -3,12 +3,8 @@
 	<name>cbfe</name>
 	<comment></comment>
 	<projects>
-		<project>bmcs</project>
-		<project>ibvpy</project>
-		<project>mathkit</project>
+		<project>matresdev</project>
 		<project>sctt</project>
-		<project>stats</project>
-		<project>util</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

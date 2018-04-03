@@ -3,19 +3,25 @@ Created on 26.03.2018
 
 @author: Yingxiong
 '''
-import matplotlib.pyplot as plt
-import numpy as np
-from cbfe.fe_nls_solver_incre import MATSEval, FETS1D52ULRH, TStepper, TLoop
+from os.path import join
+
 from ibvpy.api import BCDof
 
-# import data
-folder = 'D:\\data\\2018-02-14_DPO_Leipzig\\'
+from cbfe.fe_nls_solver_incre import MATSEval, FETS1D52ULRH, TStepper, TLoop
+import matplotlib.pyplot as plt
+from matresdev.db.simdb.simdb import simdb
+import numpy as np
 
-# measured data
-dm1, fm1 = np.loadtxt(folder + 'DPOUC21A.txt')
-dm2, fm2 = np.loadtxt(folder + 'DPOUC22A.txt')
-dm3, fm3 = np.loadtxt(folder + 'DPOUC23A.txt')
-dm4, fm4 = np.loadtxt(folder + 'DPOUC31A.txt')
+folder = join(simdb.exdata_dir,
+              'double_pullout_tests',
+              '2018-02-14_DPO_Leipzig',
+              )
+
+dm1, fm1 = np.loadtxt(join(folder, 'DPOUC21A.txt'))
+dm2, fm2 = np.loadtxt(join(folder,  'DPOUC22A.txt'))
+dm3, fm3 = np.loadtxt(join(folder,  'DPOUC23A.txt'))
+dm4, fm4 = np.loadtxt(join(folder,  'DPOUC31A.txt'))
+
 
 # skip the first part where the remaining concrete at the notch is intact
 d1 = np.hstack((0, np.linspace(0.135, 8, 100)))
@@ -90,6 +96,7 @@ def plt_expri(L_x, slip, bond, d, f, label, color):
              marker='.', color=color, markevery=5)
     plt.plot(d[d <= 8.0] / 2., f[d <= 8.0] * 1000.,
              '--', color=color, label=label)
+
 
 plt.figure()
 plt_expri(100, slip1, bond1, d1, f1, label='V1', color='k')

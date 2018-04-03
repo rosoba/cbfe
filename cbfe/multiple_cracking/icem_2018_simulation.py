@@ -3,28 +3,36 @@ Created on 27.03.2018
 
 @author: Yingxiong
 '''
-import numpy as np
-import matplotlib.pyplot as plt
-from tensile_test import CompositeTensileTest
+from os.path import join
+
 from cb import NonLinearCB
 from fe_nls_solver_cb import MATSEval, FETS1D52ULRH, TStepper, TLoop
+import matplotlib.pyplot as plt
+from matresdev.db.simdb.simdb import simdb
+import numpy as np
 from stats.misc.random_field.random_field_1D import RandomField
+from tensile_test import CompositeTensileTest
 
 
-folder = 'D:\\data\\2018-01-07_TT_Leipzig\\'
+folder = join(simdb.exdata_dir,
+              'tensile_tests',
+              'buttstrap_clamping',
+              '2018-01-07_TTb_Leipzig',
+              )
 
-DKBC11 = np.loadtxt(folder + 'DKBC11.txt')
-DKBC12 = np.loadtxt(folder + 'DKBC12.txt')
-DKBC13 = np.loadtxt(folder + 'DKBC13.txt')
-DKBC14 = np.loadtxt(folder + 'DKBC14.txt')
-DKBC15 = np.loadtxt(folder + 'DKBC15.txt')
-DKBC16 = np.loadtxt(folder + 'DKBC16.txt')
 
-DKUC21 = np.loadtxt(folder + 'DKUC21.txt')
-DKUC22 = np.loadtxt(folder + 'DKUC22.txt')
-DKUC23 = np.loadtxt(folder + 'DKUC23.txt')
-DKUC31 = np.loadtxt(folder + 'DKUC31.txt')
-DKUC32 = np.loadtxt(folder + 'DKUC32.txt')
+DKBC11 = np.loadtxt(join(folder, 'DKBC11.txt'))
+DKBC12 = np.loadtxt(join(folder,  'DKBC12.txt'))
+DKBC13 = np.loadtxt(join(folder,  'DKBC13.txt'))
+DKBC14 = np.loadtxt(join(folder,  'DKBC14.txt'))
+DKBC15 = np.loadtxt(join(folder,  'DKBC15.txt'))
+DKBC16 = np.loadtxt(join(folder,  'DKBC16.txt'))
+
+DKUC21 = np.loadtxt(join(folder, 'DKUC21.txt'))
+DKUC22 = np.loadtxt(join(folder, 'DKUC22.txt'))
+DKUC23 = np.loadtxt(join(folder, 'DKUC23.txt'))
+DKUC31 = np.loadtxt(join(folder, 'DKUC31.txt'))
+DKUC32 = np.loadtxt(join(folder, 'DKUC32.txt'))
 
 plt.plot(DKBC11[0] / 350., DKBC11[1] * 1000. / 1500., 'k', label='short')
 plt.plot(DKBC12[0] / 350., DKBC12[1] * 1000. / 1500., 'k')
@@ -85,31 +93,36 @@ plt.plot(DKUC32[0] / 350., DKUC32[1] * 1000. / 1500., 'b')
 
 plt.legend()
 
-plt.figure()
+if False:
+    plt.figure()
 
-n_2 = 'k'
-n_3 = 'g'
+    n_2 = 'k'
+    n_3 = 'g'
 
-plt.plot(DKBC11[0] / 350., DKBC11[1] * 1000. / 1500., n_2, label='2 cracks')
-plt.plot(DKBC12[0] / 350., DKBC12[1] * 1000. / 1500., n_2)
-plt.plot(DKBC13[0] / 350., DKBC13[1] * 1000. / 1500., n_2)
-plt.plot(DKBC14[0] / 350., DKBC14[1] * 1000. / 1500., n_2)
-plt.plot(DKBC15[0] / 350., DKBC15[1] * 1000. / 1500., n_3, label='3 cracks')
-plt.plot(DKBC16[0] / 350., DKBC16[1] * 1000. / 1500., n_3)
-plt.legend()
+    plt.plot(DKBC11[0] / 350., DKBC11[1] *
+             1000. / 1500., n_2, label='2 cracks')
+    plt.plot(DKBC12[0] / 350., DKBC12[1] * 1000. / 1500., n_2)
+    plt.plot(DKBC13[0] / 350., DKBC13[1] * 1000. / 1500., n_2)
+    plt.plot(DKBC14[0] / 350., DKBC14[1] * 1000. / 1500., n_2)
+    plt.plot(DKBC15[0] / 350., DKBC15[1] *
+             1000. / 1500., n_3, label='3 cracks')
+    plt.plot(DKBC16[0] / 350., DKBC16[1] * 1000. / 1500., n_3)
+    plt.legend()
 
-plt.figure()
+    plt.figure()
 
-plt.plot(DKUC21[0] / 350., DKUC21[1] * 1000. / 1500., n_3, label='3 cracks')
-plt.plot(DKUC22[0] / 350., DKUC22[1] * 1000. / 1500., n_2, label='2 cracks')
-plt.plot(DKUC23[0] / 350., DKUC23[1] * 1000. / 1500., n_3)
-plt.plot(DKUC31[0] / 350., DKUC31[1] * 1000. / 1500., n_2)
-plt.plot(DKUC32[0] / 350., DKUC32[1] * 1000. / 1500., n_2)
-plt.legend()
+    plt.plot(DKUC21[0] / 350., DKUC21[1] *
+             1000. / 1500., n_3, label='3 cracks')
+    plt.plot(DKUC22[0] / 350., DKUC22[1] *
+             1000. / 1500., n_2, label='2 cracks')
+    plt.plot(DKUC23[0] / 350., DKUC23[1] * 1000. / 1500., n_3)
+    plt.plot(DKUC31[0] / 350., DKUC31[1] * 1000. / 1500., n_2)
+    plt.plot(DKUC32[0] / 350., DKUC32[1] * 1000. / 1500., n_2)
+    plt.legend()
 
-plt.show()
+    # plt.show()
 
-# plt.show()
+    plt.show()
 
 # sig_mu = 3.
 # Em = 32701

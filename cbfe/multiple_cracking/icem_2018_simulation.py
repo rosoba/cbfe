@@ -192,18 +192,21 @@ cb = NonLinearCB(A_c=100. * 15.,
                  bond=bond,
                  n_BC=100)
 
+
 random_field = RandomField(seed=False,
-                           lacor=1.,
-                           length=2000,
+                           lacor=4,
+                           length=350,
                            nx=1000,
                            nsim=1,
                            loc=.0,
-                           stdev=0.2,
-                           mean=3.22,
-                           distr_type='Gauss')
+                           # stdev=0.2,
+                           # mean=3.22,
+                           shape=10,
+                           scale=5.30577326,
+                           distr_type='Weibull')
 
 ctt = CompositeTensileTest(n_x=1000,
-                           L=2100,
+                           L=350,
                            cb=cb,
                            sig_mu_x=random_field.random_field,
                            strength=21.26)
@@ -222,8 +225,8 @@ plt.subplots_adjust(
 # plot diagram with textile stress vs. strain
 plt.plot(eps_c_arr1 * 1000, load_arr1 *
          (fets.A_f + fets.A_m) / fets.A_f, 'k', lw=2)
-plt.title('Matrix standard deviation %1.2f ' %
-          random_field.stdev)
+plt.title('Matrix - RF shape parameter %1.1f ' %
+          random_field.shape)
 plt.ylabel('Textile Stress [MPa]')
 plt.xlabel('Strain [1E+3]')
 plt.show()

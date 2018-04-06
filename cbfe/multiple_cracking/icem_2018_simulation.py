@@ -13,6 +13,12 @@ import numpy as np
 from stats.misc.random_field.random_field_1D import RandomField
 from tensile_test import CompositeTensileTest
 
+params = {'legend.fontsize': 12,
+          #         'legend.linewidth': 2,
+          u'font.size': 12,
+          u'font.family': 'Times New Roman',
+          u'font.style': 'normal'}
+plt.rcParams.update(params)
 
 folder = join(simdb.exdata_dir,
               'tensile_tests',
@@ -34,18 +40,18 @@ DKUC23 = np.loadtxt(join(folder, 'DKUC23.txt'))
 DKUC31 = np.loadtxt(join(folder, 'DKUC31.txt'))
 DKUC32 = np.loadtxt(join(folder, 'DKUC32.txt'))
 
-plt.plot(DKBC11[0] / 350., DKBC11[1] * 1000. / 1500., 'k', label='short')
-plt.plot(DKBC12[0] / 350., DKBC12[1] * 1000. / 1500., 'k')
-plt.plot(DKBC13[0] / 350., DKBC13[1] * 1000. / 1500., 'k')
-plt.plot(DKBC14[0] / 350., DKBC14[1] * 1000. / 1500., 'k')
-plt.plot(DKBC15[0] / 350., DKBC15[1] * 1000. / 1500., 'k')
-plt.plot(DKBC16[0] / 350., DKBC16[1] * 1000. / 1500., 'k')
+plt.plot(DKBC11[0] / 355., DKBC11[1] * 1000. / 1500., 'k', label='short')
+plt.plot(DKBC12[0] / 358., DKBC12[1] * 1000. / 1500., 'k')
+plt.plot(DKBC13[0] / 357., DKBC13[1] * 1000. / 1500., 'k')
+plt.plot(DKBC14[0] / 357., DKBC14[1] * 1000. / 1500., 'k')
+plt.plot(DKBC15[0] / 360., DKBC15[1] * 1000. / 1500., 'k')
+plt.plot(DKBC16[0] / 355., DKBC16[1] * 1000. / 1500., 'k')
 
-plt.plot(DKUC21[0] / 350., DKUC21[1] * 1000. / 1500., 'b', label='long')
-plt.plot(DKUC22[0] / 350., DKUC22[1] * 1000. / 1500., 'b')
-plt.plot(DKUC23[0] / 350., DKUC23[1] * 1000. / 1500., 'b')
-plt.plot(DKUC31[0] / 350., DKUC31[1] * 1000. / 1500., 'b')
-plt.plot(DKUC32[0] / 350., DKUC32[1] * 1000. / 1500., 'b')
+plt.plot(DKUC21[0] / 357., DKUC21[1] * 1000. / 1500., 'b', label='long')
+plt.plot(DKUC22[0] / 359., DKUC22[1] * 1000. / 1500., 'b')
+plt.plot(DKUC23[0] / 343., DKUC23[1] * 1000. / 1500., 'b')
+plt.plot(DKUC31[0] / 352., DKUC31[1] * 1000. / 1500., 'b')
+plt.plot(DKUC32[0] / 349., DKUC32[1] * 1000. / 1500., 'b')
 
 # E11 = (DKBC11[1][400] - DKBC11[1][200]) * 1000. / \
 #     1500. * 350 / (DKBC11[0][400] - DKBC11[0][200])
@@ -92,6 +98,8 @@ plt.plot(DKUC32[0] / 350., DKUC32[1] * 1000. / 1500., 'b')
 # vf, E22 / vf, E23 / vf
 
 plt.legend()
+# plt.show()
+
 
 if False:
     plt.figure()
@@ -99,25 +107,25 @@ if False:
     n_2 = 'k'
     n_3 = 'g'
 
-    plt.plot(DKBC11[0] / 350., DKBC11[1] *
+    plt.plot(DKBC11[0] / 355., DKBC11[1] *
              1000. / 1500., n_2, label='2 cracks')
-    plt.plot(DKBC12[0] / 350., DKBC12[1] * 1000. / 1500., n_2)
-    plt.plot(DKBC13[0] / 350., DKBC13[1] * 1000. / 1500., n_2)
-    plt.plot(DKBC14[0] / 350., DKBC14[1] * 1000. / 1500., n_2)
-    plt.plot(DKBC15[0] / 350., DKBC15[1] *
+    plt.plot(DKBC12[0] / 358., DKBC12[1] * 1000. / 1500., n_2)
+    plt.plot(DKBC13[0] / 357., DKBC13[1] * 1000. / 1500., n_2)
+    plt.plot(DKBC14[0] / 357., DKBC14[1] * 1000. / 1500., n_2)
+    plt.plot(DKBC15[0] / 360., DKBC15[1] *
              1000. / 1500., n_3, label='3 cracks')
-    plt.plot(DKBC16[0] / 350., DKBC16[1] * 1000. / 1500., n_3)
+    plt.plot(DKBC16[0] / 355., DKBC16[1] * 1000. / 1500., n_3)
     plt.legend()
 
     plt.figure()
 
-    plt.plot(DKUC21[0] / 350., DKUC21[1] *
+    plt.plot(DKUC21[0] / 357., DKUC21[1] *
              1000. / 1500., n_3, label='3 cracks')
-    plt.plot(DKUC22[0] / 350., DKUC22[1] *
+    plt.plot(DKUC22[0] / 359., DKUC22[1] *
              1000. / 1500., n_2, label='2 cracks')
-    plt.plot(DKUC23[0] / 350., DKUC23[1] * 1000. / 1500., n_3)
-    plt.plot(DKUC31[0] / 350., DKUC31[1] * 1000. / 1500., n_2)
-    plt.plot(DKUC32[0] / 350., DKUC32[1] * 1000. / 1500., n_2)
+    plt.plot(DKUC23[0] / 343., DKUC23[1] * 1000. / 1500., n_3)
+    plt.plot(DKUC31[0] / 352., DKUC31[1] * 1000. / 1500., n_2)
+    plt.plot(DKUC32[0] / 349., DKUC32[1] * 1000. / 1500., n_2)
     plt.legend()
 
     # plt.show()
@@ -143,11 +151,11 @@ if False:
 # plt.show()
 
 
-mats = MATSEval(E_f=170000.,
+mats = MATSEval(E_f=283350.,
                 E_m=32701.)
 
-fets = FETS1D52ULRH(A_m=100. * 15. - 8. * 1.85,
-                    A_f=8. * 1.85)
+fets = FETS1D52ULRH(A_m=100. * 15. - 8. * 1.84,
+                    A_f=8. * 1.84)
 
 ts = TStepper(mats_eval=mats,
               fets_eval=fets)
@@ -163,23 +171,23 @@ slip = np.array([0.,  0.08163265,  0.16326531,  0.24489796,  0.32653061,
                  3.26530612,  3.34693878,  3.42857143,  3.51020408,  3.59183673,
                  3.67346939,  3.75510204,  3.83673469,  3.91836735,  4.]).tolist()
 
-bond = np.array([0.,  21.48945011,  24.18855866,  25.90706808,
-                 27.62557751,  29.34408693,  31.06259635,  32.78110577,
-                 33.69204278,  34.36515102,  35.03825926,  35.7113675,
-                 36.38447575,  37.05758399,  37.49913126,  37.76270515,
-                 38.02627904,  38.28985292,  38.55342681,  38.81700069,
-                 39.07777717,  39.3335713,  39.58936543,  39.84515956,
-                 40.10095368,  40.35674781,  40.60514183,  40.81241069,
-                 41.01967955,  41.2269484,  41.43421726,  41.64148611,
-                 41.84875497,  42.05375195,  42.25861779,  42.46348363,
-                 42.66834947,  42.87321531,  43.07808115,  43.2578558,
-                 43.42879514,  43.59973449,  43.77067383,  43.94161318,
-                 44.11255252,  44.24618917,  44.34707651,  44.44796385,
-                 44.54885119,  44.55455026]).tolist()
+bond = np.array([0.,  22.8196719,  28.46209226,  29.68753463,
+                 30.8023522,  31.81904245,  32.784257,  33.66000354,
+                 34.53025696,  35.35037697,  36.17049699,  36.97111783,
+                 37.56621184,  37.95859091,  38.35096998,  38.74334905,
+                 38.99005988,  39.20511549,  39.4201711,  39.65136099,
+                 39.94290047,  40.21273858,  40.48240333,  40.74687194,
+                 41.00761627,  41.26029761,  41.49180967,  41.71649435,
+                 41.940841,  42.16518765,  42.38315886,  42.58626232,
+                 42.78936577,  42.99246923,  43.21251614,  43.43229047,
+                 43.65063078,  43.86709291,  44.05708319,  44.24611786,
+                 44.42858805,  44.6117749,  44.79588207,  44.97998923,
+                 45.15764457,  45.2578736,  45.34191603,  45.42595845,
+                 45.50215681,  45.53411323]).tolist()
 
 cb = NonLinearCB(A_c=100. * 15.,
                  tstepper=ts,
-                 max_w_p=1.84 * 8 * 2300,  # [N]
+                 max_w_p=1.84 * 8 * 2167,  # [N]
                  slip=slip,
                  bond=bond,
                  n_BC=100)
@@ -191,19 +199,31 @@ random_field = RandomField(seed=False,
                            nsim=1,
                            loc=.0,
                            stdev=0.2,
-                           mean=3.0,
+                           mean=3.22,
                            distr_type='Gauss')
 
 ctt = CompositeTensileTest(n_x=1000,
-                           L=350,
+                           L=2100,
                            cb=cb,
                            sig_mu_x=random_field.random_field,
-                           strength=22.)
+                           strength=21.26)
 
 sig_c_i, z_x_i, BC_x_i, sig_c_u, n_crack = ctt.get_cracking_history()
 load_arr1 = np.unique(
     np.hstack((np.linspace(0, sig_c_u, 100), sig_c_i)))
 eps_c_arr1 = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr1)
-plt.plot(eps_c_arr1, load_arr1, 'k', lw=2)
 
+plt.figure(facecolor='white', figsize=(8.8 / 2.54, 8.8 / 2.54), dpi=100)
+plt.subplots_adjust(
+    left=0.19, right=0.96, bottom=0.15, top=0.93, wspace=0.25, hspace=0.2)
+# plot diagram with composite stress vs. strain
+# plt.plot(eps_c_arr1 * 1000, load_arr1, 'k', lw=2)
+# plt.ylabel('Composite Stress [MPa]')
+# plot diagram with textile stress vs. strain
+plt.plot(eps_c_arr1 * 1000, load_arr1 *
+         (fets.A_f + fets.A_m) / fets.A_f, 'k', lw=2)
+plt.title('Matrix standard deviation %1.2f ' %
+          random_field.stdev)
+plt.ylabel('Textile Stress [MPa]')
+plt.xlabel('Strain [1E+3]')
 plt.show()

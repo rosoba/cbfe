@@ -85,9 +85,9 @@ print [slip_avg]
 print [bond_avg]
 
 
-plt.plot(slip_avg, bond_avg, 'k--', lw=3, label='Average')
+plt.plot(slip_avg, bond_avg, 'r--', lw=3, label='Average')
 #plt.title('Calibrated bond slip laws')
-plt.xlabel('slip [mm]')
+plt.xlabel('material point slip [mm]')
 plt.ylabel('bond [N/mm]')
 plt.legend(loc=4)
 plt.show()
@@ -127,7 +127,7 @@ plt_expri(98.32, slip1, bond1, d1, f1, label='DPOUC21A', color='k')
 plt_expri(97.88, slip2, bond2, d2, f2, label='DPOUC22A', color='g')
 plt_expri(97.14, slip3, bond3, d3, f3, label='DPOUC23A', color='b')
 #plt.title('verification of pullout force')
-plt.xlabel('slip [mm]')
+plt.xlabel('pull-out slip [mm]')
 plt.ylabel('Force [N]')
 plt.legend(loc=4)
 xlim = 4.5

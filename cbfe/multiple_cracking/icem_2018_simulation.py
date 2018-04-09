@@ -201,8 +201,8 @@ random_field = RandomField(seed=False,
                            loc=.0,
                            # stdev=0.2,
                            # mean=3.22,
-                           shape=10,
-                           scale=5.30577326,
+                           shape=5,
+                           scale=8.60718591,
                            distr_type='Weibull')
 
 ctt = CompositeTensileTest(n_x=1000,

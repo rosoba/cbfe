@@ -192,26 +192,37 @@ cb = NonLinearCB(A_c=100. * 15.,
                  bond=bond,
                  n_BC=100)
 
+'''
+uncomment this loop in order to run multiple random simulations at once
+'''
+# n_crack_end = 0
+# while n_crack_end < 3:
+
 
 random_field = RandomField(seed=False,
-                           lacor=4,
-                           length=350,
-                           nx=1000,
-                           nsim=1,
-                           loc=.0,
-                           # stdev=0.2,
-                           # mean=3.22,
-                           shape=5,
-                           scale=8.60718591,
-                           distr_type='Weibull')
-
+                               lacor=4,
+                               length=350,
+                               nx=1000,
+                               nsim=1,
+                               loc=.0,
+                               # stdev=0.2,
+                               # mean=3.22,
+                               shape=5,
+                               scale=8.60718591,
+                               distr_type='Weibull')
+    
 ctt = CompositeTensileTest(n_x=1000,
-                           L=350,
-                           cb=cb,
-                           sig_mu_x=random_field.random_field,
-                           strength=21.26)
-
+                               L=350,
+                               cb=cb,
+                               sig_mu_x=random_field.random_field,
+                               strength=21.26)
+    
+    
 sig_c_i, z_x_i, BC_x_i, sig_c_u, n_crack = ctt.get_cracking_history()
+    
+#     print n_crack
+#     n_crack_end = n_crack
+
 load_arr1 = np.unique(
     np.hstack((np.linspace(0, sig_c_u, 100), sig_c_i)))
 eps_c_arr1 = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr1)
